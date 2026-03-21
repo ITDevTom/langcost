@@ -32,7 +32,7 @@ export function calculateCost(model: string, inputTokens: number, outputTokens: 
     return {
       inputCost: 0,
       outputCost: 0,
-      totalCost: 0
+      totalCost: 0,
     };
   }
 
@@ -42,6 +42,6 @@ export function calculateCost(model: string, inputTokens: number, outputTokens: 
   return {
     inputCost,
     outputCost,
-    totalCost: inputCost + outputCost
+    totalCost: inputCost + outputCost,
   };
 }

@@ -10,7 +10,7 @@ function toRow(record: IngestionStateRecord): IngestionStateRecord {
   return {
     ...record,
     lastLineHash: record.lastLineHash ?? null,
-    lastSessionId: record.lastSessionId ?? null
+    lastSessionId: record.lastSessionId ?? null,
   };
 }
 
@@ -31,17 +31,26 @@ export function createIngestionStateRepository(db: Db) {
             lastOffset: row.lastOffset,
             lastLineHash: row.lastLineHash,
             lastSessionId: row.lastSessionId,
-            updatedAt: row.updatedAt
-          }
+            updatedAt: row.updatedAt,
+          },
         })
         .run();
     },
     getBySourcePath(sourcePath: string): IngestionStateRow | null {
-      const row = db.select().from(ingestionState).where(eq(ingestionState.sourcePath, sourcePath)).get();
+      const row = db
+        .select()
+        .from(ingestionState)
+        .where(eq(ingestionState.sourcePath, sourcePath))
+        .get();
       return row ? fromRow(row) : null;
     },
     list(): IngestionStateRow[] {
-      return db.select().from(ingestionState).orderBy(desc(ingestionState.updatedAt)).all().map(fromRow);
-    }
+      return db
+        .select()
+        .from(ingestionState)
+        .orderBy(desc(ingestionState.updatedAt))
+        .all()
+        .map(fromRow);
+    },
   };
 }

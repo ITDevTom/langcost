@@ -97,7 +97,11 @@ export interface OpenClawToolResultMessage extends OpenClawBaseMessage {
 export interface OpenClawMessageEntry {
   type: "message";
   timestamp?: string;
-  message: OpenClawAssistantMessage | OpenClawToolResultMessage | OpenClawUserMessage | OpenClawBaseMessage;
+  message:
+    | OpenClawAssistantMessage
+    | OpenClawToolResultMessage
+    | OpenClawUserMessage
+    | OpenClawBaseMessage;
 }
 
 export interface OpenClawModelChangeEntry {

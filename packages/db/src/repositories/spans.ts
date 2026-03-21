@@ -25,7 +25,7 @@ function toRow(record: typeof spans.$inferInsert): typeof spans.$inferInsert {
     toolOutput: record.toolOutput ?? null,
     toolSuccess: record.toolSuccess ?? null,
     errorMessage: record.errorMessage ?? null,
-    metadata: record.metadata ?? null
+    metadata: record.metadata ?? null,
   };
 }
 
@@ -61,13 +61,19 @@ export function createSpanRepository(db: Db) {
             toolSuccess: row.toolSuccess,
             status: row.status,
             errorMessage: row.errorMessage,
-            metadata: row.metadata
-          }
+            metadata: row.metadata,
+          },
         })
         .run();
     },
     listByTraceId(traceId: string): SpanRow[] {
-      return db.select().from(spans).where(eq(spans.traceId, traceId)).orderBy(asc(spans.startedAt)).all().map(fromRow);
+      return db
+        .select()
+        .from(spans)
+        .where(eq(spans.traceId, traceId))
+        .orderBy(asc(spans.startedAt))
+        .all()
+        .map(fromRow);
     },
     count(): number {
       const row = db.select({ count: count() }).from(spans).get();
@@ -77,7 +83,7 @@ export function createSpanRepository(db: Db) {
       const rows = db
         .select({
           type: spans.type,
-          count: sql<number>`count(*)`
+          count: sql<number>`count(*)`,
         })
         .from(spans)
         .groupBy(spans.type)
@@ -88,8 +94,8 @@ export function createSpanRepository(db: Db) {
           counts[row.type] = numeric(row.count);
           return counts;
         },
-        { agent: 0, llm: 0, retrieval: 0, tool: 0 }
+        { agent: 0, llm: 0, retrieval: 0, tool: 0 },
       );
-    }
+    },
   };
 }

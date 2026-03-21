@@ -1,7 +1,7 @@
 import { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { drizzle, type BunSQLiteDatabase } from "drizzle-orm/bun-sqlite";
+import { type BunSQLiteDatabase, drizzle } from "drizzle-orm/bun-sqlite";
 
 import * as schema from "./schema";
 
@@ -29,5 +29,5 @@ export function createDb(path?: string): Db {
 }
 
 export function getSqliteClient(db: Db): Database {
-  return db.$client;
+  return (db as unknown as { $client: Database }).$client;
 }

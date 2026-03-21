@@ -1,8 +1,8 @@
+import type { Database } from "bun:sqlite";
 import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Database } from "bun:sqlite";
 
 import { createDb, getSqliteClient, migrate } from "./index";
 import { createAnalysisRunRepository } from "./repositories/analysis";
@@ -10,6 +10,7 @@ import { createFaultReportRepository } from "./repositories/faults";
 import { createIngestionStateRepository } from "./repositories/ingestion";
 import { createMessageRepository } from "./repositories/messages";
 import { createSegmentRepository } from "./repositories/segments";
+import { createSettingsRepository } from "./repositories/settings";
 import { createSpanRepository } from "./repositories/spans";
 import { createTraceRepository } from "./repositories/traces";
 import { createWasteReportRepository } from "./repositories/waste";
@@ -64,6 +65,7 @@ describe("database client", () => {
     const faultRepository = createFaultReportRepository(db);
     const ingestionRepository = createIngestionStateRepository(db);
     const analysisRepository = createAnalysisRunRepository(db);
+    const settingsRepository = createSettingsRepository(db);
 
     const startedAt = new Date("2026-03-21T09:00:00.000Z");
     const endedAt = new Date("2026-03-21T09:02:00.000Z");
@@ -85,7 +87,7 @@ describe("database client", () => {
       model: "claude-sonnet-4",
       status: "complete",
       metadata: { cwd: "/workspace" },
-      ingestedAt: updatedAt
+      ingestedAt: updatedAt,
     });
 
     spanRepository.upsert({
@@ -103,7 +105,7 @@ describe("database client", () => {
       outputTokens: 80,
       costUsd: 0.42,
       status: "ok",
-      metadata: { turn: 1 }
+      metadata: { turn: 1 },
     });
 
     messageRepository.upsert({
@@ -114,7 +116,7 @@ describe("database client", () => {
       content: "Fix the bug",
       tokenCount: 3,
       position: 0,
-      metadata: { source: "prompt" }
+      metadata: { source: "prompt" },
     });
 
     segmentRepository.upsert({
@@ -126,7 +128,7 @@ describe("database client", () => {
       costUsd: 0.01,
       percentOfSpan: 0.025,
       contentHash: "abc123",
-      analyzedAt
+      analyzedAt,
     });
 
     wasteRepository.upsert({
@@ -141,7 +143,7 @@ describe("database client", () => {
       recommendation: "Add loop guards.",
       estimatedSavingsUsd: 1.25,
       evidence: { sequence: ["bash", "read"] },
-      detectedAt
+      detectedAt,
     });
 
     faultRepository.upsert({
@@ -152,7 +154,7 @@ describe("database client", () => {
       description: "The tool call failed upstream.",
       cascadeDepth: 1,
       affectedSpanIds: ["span-1"],
-      detectedAt
+      detectedAt,
     });
 
     ingestionRepository.upsert({
@@ -161,7 +163,7 @@ describe("database client", () => {
       lastOffset: 512,
       lastLineHash: "line-hash",
       lastSessionId: "session-1",
-      updatedAt
+      updatedAt,
     });
 
     analysisRepository.upsert({
@@ -171,8 +173,16 @@ describe("database client", () => {
       completedAt: detectedAt,
       tracesAnalyzed: 1,
       findingsCount: 1,
-      status: "complete"
+      status: "complete",
     });
+
+    settingsRepository.setSourceConfig(
+      {
+        source: "openclaw",
+        sourcePath: "~/.openclaw",
+      },
+      updatedAt,
+    );
 
     expect(traceRepository.count()).toBe(1);
     expect(spanRepository.count()).toBe(1);
@@ -185,21 +195,73 @@ describe("database client", () => {
     expect(faultRepository.listByTraceId("trace-1")[0]?.faultType).toBe("tool_failure");
     expect(ingestionRepository.getBySourcePath("/tmp/session.jsonl")?.lastOffset).toBe(512);
     expect(analysisRepository.listLatest(1)[0]?.analyzerName).toBe("cost-analyzer");
+    expect(settingsRepository.getSourceConfig()).toEqual({
+      source: "openclaw",
+      sourcePath: "~/.openclaw",
+    });
     expect(traceRepository.totals()).toEqual({
       totalCostUsd: 0.42,
       totalInputTokens: 120,
-      totalOutputTokens: 80
+      totalOutputTokens: 80,
     });
     expect(segmentRepository.summarizeByType()[0]).toEqual({
       type: "user_query",
       totalTokens: 3,
-      totalCostUsd: 0.01
+      totalCostUsd: 0.01,
     });
     expect(wasteRepository.summarizeByCategory()[0]).toEqual({
       category: "agent_loop",
       count: 1,
       totalWastedTokens: 20,
-      totalWastedCostUsd: 0.05
+      totalWastedCostUsd: 0.05,
     });
+  });
+
+  it("deletes traces by id with cascading cleanup", () => {
+    const db = createTempDatabase();
+
+    const traceRepository = createTraceRepository(db);
+    const spanRepository = createSpanRepository(db);
+
+    const updatedAt = new Date("2026-03-21T09:05:00.000Z");
+
+    traceRepository.upsert({
+      id: "trace-keep",
+      externalId: "trace-keep",
+      source: "openclaw",
+      startedAt: updatedAt,
+      totalInputTokens: 10,
+      totalOutputTokens: 5,
+      totalCostUsd: 0.01,
+      status: "complete",
+      ingestedAt: updatedAt,
+    });
+
+    traceRepository.upsert({
+      id: "trace-drop",
+      externalId: "trace-drop",
+      source: "openclaw",
+      startedAt: updatedAt,
+      totalInputTokens: 20,
+      totalOutputTokens: 10,
+      totalCostUsd: 0.02,
+      status: "complete",
+      ingestedAt: updatedAt,
+    });
+
+    spanRepository.upsert({
+      id: "span-drop",
+      traceId: "trace-drop",
+      externalId: "span-drop",
+      type: "llm",
+      startedAt: updatedAt,
+      status: "ok",
+    });
+
+    traceRepository.deleteByIds(["trace-drop"]);
+
+    expect(traceRepository.getById("trace-keep")?.id).toBe("trace-keep");
+    expect(traceRepository.getById("trace-drop")).toBeNull();
+    expect(spanRepository.count()).toBe(0);
   });
 });

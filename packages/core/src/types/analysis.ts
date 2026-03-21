@@ -45,7 +45,13 @@ export interface CostBreakdown {
   wastedCostUsd: number;
 }
 
-export type FaultType = "upstream_data" | "model_error" | "tool_failure" | "loop" | "timeout" | "unknown";
+export type FaultType =
+  | "upstream_data"
+  | "model_error"
+  | "tool_failure"
+  | "loop"
+  | "timeout"
+  | "unknown";
 
 export interface FaultReport {
   id: string;

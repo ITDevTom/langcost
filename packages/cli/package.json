@@ -1,0 +1,19 @@
+{
+  "name": "@langcost/cli",
+  "version": "0.0.1",
+  "type": "module",
+  "bin": {
+    "langcost": "./src/index.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@langcost/analyzers": "workspace:*",
+    "@langcost/core": "workspace:*",
+    "@langcost/db": "workspace:*"
+  }
+}

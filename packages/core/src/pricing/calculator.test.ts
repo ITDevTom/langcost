@@ -17,7 +17,7 @@ describe("calculateCost", () => {
     expect(calculateCost("gpt-4o", 1_000_000, 500_000)).toEqual({
       inputCost: 2.5,
       outputCost: 5,
-      totalCost: 7.5
+      totalCost: 7.5,
     });
   });
 
@@ -25,7 +25,7 @@ describe("calculateCost", () => {
     expect(calculateCost("unknown-model", 100, 200)).toEqual({
       inputCost: 0,
       outputCost: 0,
-      totalCost: 0
+      totalCost: 0,
     });
   });
 });

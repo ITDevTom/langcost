@@ -52,10 +52,12 @@ export async function readSessionFile(filePath: string): Promise<ReadSessionResu
   buffered += decoder.decode();
   parseLine(buffered);
 
+  const lastLineHash = lastNonEmptyLine ? await sha256(lastNonEmptyLine) : undefined;
+
   return {
     entries,
-    lastLineHash: lastNonEmptyLine ? await sha256(lastNonEmptyLine) : undefined,
+    ...(lastLineHash ? { lastLineHash } : {}),
     lastOffset,
-    errors
+    errors,
   };
 }

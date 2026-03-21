@@ -13,6 +13,7 @@ function toUint8Array(input: string | ArrayBuffer | Uint8Array): Uint8Array {
 }
 
 export async function sha256(input: string | ArrayBuffer | Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", toUint8Array(input));
+  const bytes = toUint8Array(input);
+  const digest = await crypto.subtle.digest("SHA-256", bytes.buffer as ArrayBuffer);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }

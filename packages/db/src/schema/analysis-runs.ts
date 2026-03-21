@@ -13,10 +13,10 @@ export const analysisRuns = sqliteTable(
     tracesAnalyzed: integer("traces_analyzed").notNull(),
     findingsCount: integer("findings_count").notNull(),
     status: text("status", { enum: analysisRunStatusValues }).notNull(),
-    errorMessage: text("error_message")
+    errorMessage: text("error_message"),
   },
   (table) => [
     index("idx_analysis_runs_analyzer_name").on(table.analyzerName),
-    check("analysis_runs_status_check", sql`${table.status} in ('running', 'complete', 'error')`)
-  ]
+    check("analysis_runs_status_check", sql`${table.status} in ('running', 'complete', 'error')`),
+  ],
 );

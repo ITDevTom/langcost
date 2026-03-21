@@ -1,8 +1,8 @@
+import type { Database } from "bun:sqlite";
 import { afterEach, describe, expect, it } from "bun:test";
 import { appendFileSync, copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Database } from "bun:sqlite";
 
 import {
   createDb,
@@ -11,7 +11,7 @@ import {
   createSpanRepository,
   createTraceRepository,
   getSqliteClient,
-  migrate
+  migrate,
 } from "@langcost/db";
 
 import openClawAdapter from "../src/index";
@@ -52,6 +52,15 @@ function copyFixtureToTempFile(fixtureName: string): string {
   return targetPath;
 }
 
+function getFirstTrace(db: Parameters<typeof createTraceRepository>[0]) {
+  const trace = createTraceRepository(db).list(1, 0)[0];
+  if (!trace) {
+    throw new Error("Expected an ingested trace");
+  }
+
+  return trace;
+}
+
 describe("openClawAdapter", () => {
   it("exports a usable default adapter from the package entry point", async () => {
     const fixture = join(process.cwd(), "fixtures", "openclaw", "simple-session.jsonl");
@@ -69,6 +78,14 @@ describe("openClawAdapter", () => {
     expect(validation.message.includes("Found OpenClaw session file")).toBe(true);
   });
 
+  it("returns a friendly validation error when the OpenClaw directory does not exist", async () => {
+    const missingRoot = join(tmpdir(), `langcost-openclaw-missing-${Date.now()}`);
+    const validation = await openClawAdapter.validate({ sourcePath: missingRoot });
+
+    expect(validation.ok).toBe(false);
+    expect(validation.message).toContain("OpenClaw agents directory not found");
+  });
+
   it("ingests a simple session and skips it on a second run", async () => {
     const db = createTempDb();
     const fixture = join(process.cwd(), "fixtures", "openclaw", "simple-session.jsonl");
@@ -76,9 +93,8 @@ describe("openClawAdapter", () => {
     const firstResult = await openClawAdapter.ingest(db, { file: fixture });
     const secondResult = await openClawAdapter.ingest(db, { file: fixture });
 
-    const traceRepository = createTraceRepository(db);
     const spanRepository = createSpanRepository(db);
-    const trace = traceRepository.list(1, 0)[0];
+    const trace = getFirstTrace(db);
 
     expect(firstResult.tracesIngested).toBe(1);
     expect(firstResult.spansIngested).toBe(3);
@@ -86,7 +102,7 @@ describe("openClawAdapter", () => {
     expect(secondResult.skipped).toBe(1);
     expect(trace?.source).toBe("openclaw");
     expect(trace?.status).toBe("complete");
-    expect(spanRepository.listByTraceId(trace!.id)).toHaveLength(3);
+    expect(spanRepository.listByTraceId(trace.id)).toHaveLength(3);
   });
 
   it("re-ingests a session file after the source file changes", async () => {
@@ -111,18 +127,18 @@ describe("openClawAdapter", () => {
             input: 10,
             output: 5,
             totalTokens: 15,
-            cost: { input: 0.00003, output: 0.000075, total: 0.000105 }
+            cost: { input: 0.00003, output: 0.000075, total: 0.000105 },
           },
           stopReason: "stop",
-          timestamp: 1760000005000
-        }
-      })}\n`
+          timestamp: 1760000005000,
+        },
+      })}\n`,
     );
 
     const secondResult = await openClawAdapter.ingest(db, { file: fixture });
-    const trace = createTraceRepository(db).list(1, 0)[0];
-    const spans = createSpanRepository(db).listByTraceId(trace!.id);
-    const messages = createMessageRepository(db).listByTraceId(trace!.id);
+    const trace = getFirstTrace(db);
+    const spans = createSpanRepository(db).listByTraceId(trace.id);
+    const messages = createMessageRepository(db).listByTraceId(trace.id);
     const secondState = createIngestionStateRepository(db).getBySourcePath(fixture);
 
     expect(firstResult.tracesIngested).toBe(1);
@@ -139,11 +155,12 @@ describe("openClawAdapter", () => {
 
     await openClawAdapter.ingest(db, { file: fixture });
 
-    const traceRepository = createTraceRepository(db);
     const spanRepository = createSpanRepository(db);
-    const trace = traceRepository.list(1, 0)[0];
-    const spans = spanRepository.listByTraceId(trace!.id);
-    const estimatedLlmSpan = spans.find((span) => span.type === "llm" && (span.inputTokens ?? 0) > 0 && (span.costUsd ?? 0) > 0);
+    const trace = getFirstTrace(db);
+    const spans = spanRepository.listByTraceId(trace.id);
+    const estimatedLlmSpan = spans.find(
+      (span) => span.type === "llm" && (span.inputTokens ?? 0) > 0 && (span.costUsd ?? 0) > 0,
+    );
 
     expect(trace?.status).toBe("partial");
     expect(estimatedLlmSpan).toBeDefined();
@@ -156,14 +173,14 @@ describe("openClawAdapter", () => {
 
     await openClawAdapter.ingest(db, { file: fixture });
 
-    const trace = createTraceRepository(db).list(1, 0)[0];
-    const messages = createMessageRepository(db).listByTraceId(trace!.id);
+    const trace = getFirstTrace(db);
+    const messages = createMessageRepository(db).listByTraceId(trace.id);
 
     expect(messages.map((message) => message.role)).toEqual([
       "user",
       "assistant",
       "tool",
-      "assistant"
+      "assistant",
     ]);
   });
 
@@ -173,12 +190,9 @@ describe("openClawAdapter", () => {
 
     await openClawAdapter.ingest(db, { file: fixture });
 
-    const traceRepository = createTraceRepository(db);
     const spanRepository = createSpanRepository(db);
-    const trace = traceRepository.list(1, 0)[0];
-    const llmSpans = spanRepository
-      .listByTraceId(trace!.id)
-      .filter((span) => span.type === "llm");
+    const trace = getFirstTrace(db);
+    const llmSpans = spanRepository.listByTraceId(trace.id).filter((span) => span.type === "llm");
 
     expect(llmSpans).toHaveLength(2);
     expect(llmSpans.some((span) => span.model === "claude-sonnet-4-20250514")).toBe(true);
@@ -191,9 +205,9 @@ describe("openClawAdapter", () => {
 
     await openClawAdapter.ingest(db, { file: fixture });
 
-    const trace = createTraceRepository(db).list(1, 0)[0];
+    const trace = getFirstTrace(db);
     const toolSpans = createSpanRepository(db)
-      .listByTraceId(trace!.id)
+      .listByTraceId(trace.id)
       .filter((span) => span.type === "tool");
     const failedToolSpan = toolSpans.find((span) => span.toolName === "bash");
 

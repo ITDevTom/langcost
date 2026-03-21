@@ -20,10 +20,10 @@ export const messages = sqliteTable(
     content: text("content").notNull(),
     tokenCount: integer("token_count"),
     position: integer("position").notNull(),
-    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown> | null>()
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown> | null>(),
   },
   (table) => [
     index("idx_messages_trace_id_position").on(table.traceId, table.position),
-    check("messages_role_check", sql`${table.role} in ('system', 'user', 'assistant', 'tool')`)
-  ]
+    check("messages_role_check", sql`${table.role} in ('system', 'user', 'assistant', 'tool')`),
+  ],
 );

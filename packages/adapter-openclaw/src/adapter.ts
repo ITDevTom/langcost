@@ -1,10 +1,13 @@
+import { stat } from "node:fs/promises";
+import { join } from "node:path";
+
 import type { IAdapter, IngestOptions, IngestResult } from "@langcost/core";
 import type { Db } from "@langcost/db";
 import {
   createIngestionStateRepository,
   createMessageRepository,
   createSpanRepository,
-  createTraceRepository
+  createTraceRepository,
 } from "@langcost/db";
 
 import { discoverSessionFiles, getOpenClawRoot } from "./discovery";
@@ -44,19 +47,41 @@ export const openClawAdapter: IAdapter<Db> = {
     name: "openclaw",
     version: "0.0.1",
     description: "Ingest OpenClaw JSONL sessions from local disk into langcost SQLite.",
-    sourceType: "local"
+    sourceType: "local",
   },
 
   async validate(options?: IngestOptions) {
     try {
-      const discovered = await discoverSessionFiles(options);
       if (options?.file) {
+        const discovered = await discoverSessionFiles(options);
         return discovered.length > 0
           ? { ok: true, message: `Found OpenClaw session file at ${options.file}` }
           : { ok: false, message: `OpenClaw session file not found: ${options.file}` };
       }
 
       const root = getOpenClawRoot(options?.sourcePath);
+      const agentsPath = join(root, "agents");
+
+      try {
+        const agentsDirectory = await stat(agentsPath);
+        if (!agentsDirectory.isDirectory()) {
+          return {
+            ok: false,
+            message: `OpenClaw agents directory not found: ${agentsPath}. Check your source path in Settings.`,
+          };
+        }
+      } catch (error) {
+        if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+          return {
+            ok: false,
+            message: `OpenClaw agents directory not found: ${agentsPath}. Check your source path in Settings.`,
+          };
+        }
+
+        throw error;
+      }
+
+      const discovered = await discoverSessionFiles(options);
       return discovered.length > 0
         ? { ok: true, message: `Found ${discovered.length} OpenClaw session files under ${root}` }
         : { ok: false, message: `No OpenClaw session files found under ${root}` };
@@ -80,14 +105,18 @@ export const openClawAdapter: IAdapter<Db> = {
     let spansIngested = 0;
     let messagesIngested = 0;
 
-    options?.onProgress?.({ phase: "discovering", current: discovered.length, total: discovered.length });
+    options?.onProgress?.({
+      phase: "discovering",
+      current: discovered.length,
+      total: discovered.length,
+    });
 
     for (const [index, session] of discovered.entries()) {
       options?.onProgress?.({
         phase: "reading",
         current: index + 1,
         total: discovered.length,
-        sessionId: session.sessionId
+        sessionId: session.sessionId,
       });
 
       const readResult = await readSessionFile(session.filePath);
@@ -96,7 +125,7 @@ export const openClawAdapter: IAdapter<Db> = {
         phase: "normalizing",
         current: index + 1,
         total: discovered.length,
-        sessionId: session.sessionId
+        sessionId: session.sessionId,
       });
 
       const normalized = normalizeSession(session, readResult);
@@ -106,7 +135,7 @@ export const openClawAdapter: IAdapter<Db> = {
         phase: "writing",
         current: index + 1,
         total: discovered.length,
-        sessionId: session.sessionId
+        sessionId: session.sessionId,
       });
 
       traceRepository.upsert(normalized.trace);
@@ -122,7 +151,7 @@ export const openClawAdapter: IAdapter<Db> = {
         lastOffset: readResult.lastOffset,
         lastLineHash: readResult.lastLineHash,
         lastSessionId: session.sessionId,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       });
 
       tracesIngested += 1;
@@ -136,7 +165,7 @@ export const openClawAdapter: IAdapter<Db> = {
       messagesIngested,
       skipped,
       errors,
-      durationMs: Date.now() - startedAt
+      durationMs: Date.now() - startedAt,
     };
-  }
+  },
 };

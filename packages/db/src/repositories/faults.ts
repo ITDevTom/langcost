@@ -9,7 +9,7 @@ type FaultReportRow = typeof faultReports.$inferSelect;
 function toRow(record: FaultReportRecord): FaultReportRecord {
   return {
     ...record,
-    rootCauseSpanId: record.rootCauseSpanId ?? null
+    rootCauseSpanId: record.rootCauseSpanId ?? null,
   };
 }
 
@@ -33,8 +33,8 @@ export function createFaultReportRepository(db: Db) {
             description: row.description,
             cascadeDepth: row.cascadeDepth,
             affectedSpanIds: row.affectedSpanIds,
-            detectedAt: row.detectedAt
-          }
+            detectedAt: row.detectedAt,
+          },
         })
         .run();
     },
@@ -46,6 +46,6 @@ export function createFaultReportRepository(db: Db) {
         .orderBy(desc(faultReports.detectedAt))
         .all()
         .map(fromRow);
-    }
+    },
   };
 }

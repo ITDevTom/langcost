@@ -11,8 +11,11 @@
     "test": "bun test",
     "test:core": "bun test packages/core",
     "test:db": "bun test packages/db",
-    "lint": "bunx @biomejs/biome check .",
-    "format": "bunx @biomejs/biome format --write ."
+    "dev:api": "bun run --cwd apps/api dev",
+    "dev:web": "bun run --cwd apps/web dev",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome check .",
+    "format": "biome format --write ."
   },
   "keywords": [
     "llm",
@@ -31,5 +34,13 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/vjvkrm/langcost"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
+    "@types/bun": "^1.3.11",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^5.9.3"
   }
 }

@@ -15,7 +15,7 @@ const wasteCategoryValues = [
   "retry_waste",
   "tool_failure_waste",
   "high_output",
-  "oversized_context"
+  "oversized_context",
 ] as const;
 
 const severityValues = ["low", "medium", "high", "critical"] as const;
@@ -36,7 +36,7 @@ export const wasteReports = sqliteTable(
     recommendation: text("recommendation").notNull(),
     estimatedSavingsUsd: real("estimated_savings_usd"),
     evidence: text("evidence", { mode: "json" }).$type<Record<string, unknown>>().notNull(),
-    detectedAt: integer("detected_at", { mode: "timestamp_ms" }).notNull()
+    detectedAt: integer("detected_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [
     index("idx_waste_reports_trace_id_category").on(table.traceId, table.category),
@@ -54,8 +54,11 @@ export const wasteReports = sqliteTable(
         'tool_failure_waste',
         'high_output',
         'oversized_context'
-      )`
+      )`,
     ),
-    check("waste_reports_severity_check", sql`${table.severity} in ('low', 'medium', 'high', 'critical')`)
-  ]
+    check(
+      "waste_reports_severity_check",
+      sql`${table.severity} in ('low', 'medium', 'high', 'critical')`,
+    ),
+  ],
 );

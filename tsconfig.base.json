@@ -1,10 +1,20 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "moduleDetection": "force",
+    "baseUrl": ".",
+    "paths": {
+      "@langcost/core": ["packages/core/src/index.ts"],
+      "@langcost/db": ["packages/db/src/index.ts"],
+      "@langcost/analyzers": ["packages/analyzers/src/index.ts"],
+      "@langcost/adapter-openclaw": ["packages/adapter-openclaw/src/index.ts"],
+      "@langcost/cli": ["packages/cli/src/index.ts"],
+      "@langcost/api": ["apps/api/src/index.ts"]
+    },
+    "types": ["bun", "node"],
     "strict": true,
     "noEmit": true,
     "isolatedModules": true,

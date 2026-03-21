@@ -19,10 +19,10 @@ export const traces = sqliteTable(
     model: text("model"),
     status: text("status", { enum: traceStatusValues }).notNull(),
     metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown> | null>(),
-    ingestedAt: integer("ingested_at", { mode: "timestamp_ms" }).notNull()
+    ingestedAt: integer("ingested_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [
     index("idx_traces_started_at").on(table.startedAt),
-    check("traces_status_check", sql`${table.status} in ('complete', 'error', 'partial')`)
-  ]
+    check("traces_status_check", sql`${table.status} in ('complete', 'error', 'partial')`),
+  ],
 );

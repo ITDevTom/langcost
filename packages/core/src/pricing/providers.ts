@@ -12,20 +12,20 @@ export const MODEL_PRICING: ModelPricing[] = [
   {
     provider: "anthropic",
     model: "claude-opus-4-20250514",
-    aliases: ["claude-opus-4", "opus-4"],
+    aliases: ["claude-opus-4", "claude-opus-4-5", "opus-4", "opus-4-5"],
     inputPricePerMToken: 15,
     outputPricePerMToken: 75,
     cachedInputPricePerMToken: 1.5,
-    updatedAt: "2025-05-14"
+    updatedAt: "2025-05-14",
   },
   {
     provider: "anthropic",
     model: "claude-sonnet-4-20250514",
-    aliases: ["claude-sonnet-4", "sonnet-4"],
+    aliases: ["claude-sonnet-4", "claude-sonnet-4-5", "sonnet-4", "sonnet-4-5"],
     inputPricePerMToken: 3,
     outputPricePerMToken: 15,
     cachedInputPricePerMToken: 0.3,
-    updatedAt: "2025-05-14"
+    updatedAt: "2025-05-14",
   },
   {
     provider: "anthropic",
@@ -34,7 +34,7 @@ export const MODEL_PRICING: ModelPricing[] = [
     inputPricePerMToken: 0.8,
     outputPricePerMToken: 4,
     cachedInputPricePerMToken: 0.08,
-    updatedAt: "2024-10-22"
+    updatedAt: "2024-10-22",
   },
   {
     provider: "openai",
@@ -43,7 +43,7 @@ export const MODEL_PRICING: ModelPricing[] = [
     inputPricePerMToken: 2.5,
     outputPricePerMToken: 10,
     cachedInputPricePerMToken: 1.25,
-    updatedAt: "2024-08-06"
+    updatedAt: "2024-08-06",
   },
   {
     provider: "openai",
@@ -52,7 +52,7 @@ export const MODEL_PRICING: ModelPricing[] = [
     inputPricePerMToken: 0.15,
     outputPricePerMToken: 0.6,
     cachedInputPricePerMToken: 0.075,
-    updatedAt: "2024-07-18"
+    updatedAt: "2024-07-18",
   },
   {
     provider: "google",
@@ -60,7 +60,7 @@ export const MODEL_PRICING: ModelPricing[] = [
     aliases: ["gemini-flash", "gemini-2-flash"],
     inputPricePerMToken: 0.1,
     outputPricePerMToken: 0.4,
-    updatedAt: "2025-02-01"
+    updatedAt: "2025-02-01",
   },
   {
     provider: "google",
@@ -68,6 +68,6 @@ export const MODEL_PRICING: ModelPricing[] = [
     aliases: ["gemini-pro", "gemini-2-pro"],
     inputPricePerMToken: 1.25,
     outputPricePerMToken: 10,
-    updatedAt: "2025-02-01"
-  }
+    updatedAt: "2025-02-01",
+  },
 ];

@@ -3,6 +3,7 @@ export * from "./faults";
 export * from "./ingestion";
 export * from "./messages";
 export * from "./segments";
+export * from "./settings";
 export * from "./shared";
 export * from "./spans";
 export * from "./traces";

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { copyFileSync, mkdtempSync, mkdirSync, rmSync, utimesSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -56,10 +56,34 @@ describe("discoverSessionFiles", () => {
 
     const discovered = await discoverSessionFiles({
       sourcePath: root,
-      since: new Date("2026-03-01T00:00:00.000Z")
+      since: new Date("2026-03-01T00:00:00.000Z"),
     });
 
     expect(discovered).toHaveLength(1);
     expect(discovered[0]?.filePath).toBe(newPath);
+  });
+
+  it("expands tilde-prefixed source paths against HOME", async () => {
+    const homeRoot = mkdtempSync(join(tmpdir(), "langcost-openclaw-home-"));
+    cleanupPaths.push(homeRoot);
+
+    const sessionsDir = join(homeRoot, ".openclaw", "agents", "agent-1", "sessions");
+    mkdirSync(sessionsDir, { recursive: true });
+
+    const fixturePath = join(process.cwd(), "fixtures", "openclaw", "simple-session.jsonl");
+    const copiedPath = join(sessionsDir, "simple-session.jsonl");
+    copyFileSync(fixturePath, copiedPath);
+
+    const previousHome = process.env.HOME;
+    process.env.HOME = homeRoot;
+
+    try {
+      const discovered = await discoverSessionFiles({ sourcePath: "~/.openclaw" });
+
+      expect(discovered).toHaveLength(1);
+      expect(discovered[0]?.filePath).toBe(copiedPath);
+    } finally {
+      process.env.HOME = previousHome;
+    }
   });
 });

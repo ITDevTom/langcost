@@ -12,7 +12,7 @@ const segmentTypeValues = [
   "user_query",
   "assistant_response",
   "tool_result",
-  "unknown"
+  "unknown",
 ] as const;
 
 export const segments = sqliteTable(
@@ -32,7 +32,7 @@ export const segments = sqliteTable(
     contentHash: text("content_hash"),
     charStart: integer("char_start"),
     charEnd: integer("char_end"),
-    analyzedAt: integer("analyzed_at", { mode: "timestamp_ms" }).notNull()
+    analyzedAt: integer("analyzed_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [
     index("idx_segments_trace_id_type").on(table.traceId, table.type),
@@ -47,7 +47,7 @@ export const segments = sqliteTable(
         'assistant_response',
         'tool_result',
         'unknown'
-      )`
-    )
-  ]
+      )`,
+    ),
+  ],
 );

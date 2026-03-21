@@ -1,19 +1,6 @@
+import type { IngestError, Message } from "@langcost/core";
 import { calculateCost, estimateTokenCount } from "@langcost/core";
-import type {
-  IngestError,
-  Message,
-  Span,
-  Trace
-} from "@langcost/core";
-import type {
-  FaultReportRecord,
-  IngestionStateRecord,
-  MessageRecord,
-  SegmentRecord,
-  SpanRecord,
-  TraceRecord,
-  WasteReportRecord
-} from "@langcost/db";
+import type { MessageRecord, SpanRecord, TraceRecord } from "@langcost/db";
 
 import type {
   DiscoveredSessionFile,
@@ -21,13 +8,16 @@ import type {
   OpenClawCompactionEntry,
   OpenClawContentBlock,
   OpenClawEntry,
+  OpenClawImageBlock,
   OpenClawMessageEntry,
   OpenClawModelChangeEntry,
   OpenClawSessionEntry,
+  OpenClawTextBlock,
+  OpenClawThinkingBlock,
   OpenClawToolCallBlock,
   OpenClawToolResultMessage,
   OpenClawUsage,
-  ReadSessionResult
+  ReadSessionResult,
 } from "./types";
 
 export interface NormalizedSession {
@@ -68,12 +58,57 @@ function parseTimestamp(value?: string | number | null): Date | undefined {
   return undefined;
 }
 
+function isSessionEntry(entry: OpenClawEntry): entry is OpenClawSessionEntry {
+  return entry.type === "session" && typeof (entry as { id?: unknown }).id === "string";
+}
+
+function isMessageEntry(entry: OpenClawEntry): entry is OpenClawMessageEntry {
+  return (
+    entry.type === "message" &&
+    typeof (entry as { message?: unknown }).message === "object" &&
+    (entry as { message?: unknown }).message !== null
+  );
+}
+
+function isModelChangeEntry(entry: OpenClawEntry): entry is OpenClawModelChangeEntry {
+  return entry.type === "model_change";
+}
+
+function isCompactionEntry(entry: OpenClawEntry): entry is OpenClawCompactionEntry {
+  return entry.type === "compaction";
+}
+
+function isTextBlock(block: OpenClawContentBlock): block is OpenClawTextBlock {
+  return block.type === "text";
+}
+
+function isThinkingBlock(block: OpenClawContentBlock): block is OpenClawThinkingBlock {
+  return block.type === "thinking";
+}
+
+function isToolCallBlock(block: OpenClawContentBlock): block is OpenClawToolCallBlock {
+  return block.type === "toolCall";
+}
+
+function isImageBlock(block: OpenClawContentBlock): block is OpenClawImageBlock {
+  return block.type === "image";
+}
+
+function isAssistantMessage(
+  message: OpenClawMessageEntry["message"],
+): message is OpenClawAssistantMessage {
+  return message.role === "assistant";
+}
+
+function isToolResultMessage(
+  message: OpenClawMessageEntry["message"],
+): message is OpenClawToolResultMessage {
+  return message.role === "toolResult";
+}
+
 function extractEntryTimestamp(entry: OpenClawEntry): Date | undefined {
-  if (entry.type === "message") {
-    return (
-      parseTimestamp(entry.message.timestamp) ??
-      parseTimestamp(entry.timestamp)
-    );
+  if (isMessageEntry(entry)) {
+    return parseTimestamp(entry.message.timestamp) ?? parseTimestamp(entry.timestamp);
   }
 
   return parseTimestamp(entry.timestamp);
@@ -90,19 +125,19 @@ function flattenContent(content?: OpenClawContentBlock[] | string): string {
 
   return content
     .map((block) => {
-      if (block.type === "text") {
+      if (isTextBlock(block)) {
         return block.text ?? "";
       }
 
-      if (block.type === "thinking") {
+      if (isThinkingBlock(block)) {
         return block.thinking ?? block.text ?? "";
       }
 
-      if (block.type === "toolCall") {
+      if (isToolCallBlock(block)) {
         return `[tool:${block.name ?? "unknown"}] ${JSON.stringify(block.arguments ?? {})}`;
       }
 
-      if (block.type === "image") {
+      if (isImageBlock(block)) {
         return `[image:${block.mimeType ?? block.mediaType ?? "unknown"}]`;
       }
 
@@ -117,7 +152,7 @@ function extractToolCalls(content?: OpenClawContentBlock[] | string): OpenClawTo
     return [];
   }
 
-  return content.filter((block): block is OpenClawToolCallBlock => block.type === "toolCall");
+  return content.filter(isToolCallBlock);
 }
 
 function serializeValue(value: unknown): string | undefined {
@@ -136,7 +171,7 @@ function getUsageTotals(
   usage: OpenClawUsage | undefined,
   model: string | undefined,
   inputContent: string,
-  outputContent: string
+  outputContent: string,
 ) {
   const hasUsage = usage !== undefined;
   const inputTokens = usage?.input ?? estimateTokenCount(inputContent);
@@ -145,14 +180,14 @@ function getUsageTotals(
   if (usage?.cost?.total !== undefined) {
     return {
       costUsd: usage.cost.total,
-      estimated: !hasUsage
+      estimated: !hasUsage,
     };
   }
 
   const calculated = model ? calculateCost(model, inputTokens, outputTokens) : { totalCost: 0 };
   return {
     costUsd: calculated.totalCost,
-    estimated: !hasUsage || usage?.cost?.total === undefined
+    estimated: !hasUsage || usage?.cost?.total === undefined,
   };
 }
 
@@ -162,7 +197,7 @@ function buildMessage(
   role: Message["role"],
   content: string,
   position: number,
-  metadata?: Record<string, unknown>
+  metadata?: Record<string, unknown>,
 ): MessageRecord {
   return {
     id: toMessageId(spanId, position),
@@ -172,13 +207,13 @@ function buildMessage(
     content,
     tokenCount: content.length > 0 ? estimateTokenCount(content) : 0,
     position,
-    metadata: metadata ?? null
+    metadata: metadata ?? null,
   };
 }
 
 export function normalizeSession(
   sessionFile: DiscoveredSessionFile,
-  readResult: ReadSessionResult
+  readResult: ReadSessionResult,
 ): NormalizedSession {
   const traceId = toTraceId(sessionFile.sessionId);
   const spans: SpanRecord[] = [];
@@ -186,7 +221,7 @@ export function normalizeSession(
   const errors: IngestError[] = readResult.errors.map((error) => ({
     file: sessionFile.filePath,
     line: error.line,
-    message: error.message
+    message: error.message,
   }));
 
   let sessionHeader: OpenClawSessionEntry | undefined;
@@ -236,30 +271,29 @@ export function normalizeSession(
       lastActivityAt = timestamp;
     }
 
-    if (entry.type === "session") {
+    if (isSessionEntry(entry)) {
       sessionHeader = entry;
       currentModel = entry.modelId ?? currentModel;
       currentProvider = entry.provider ?? currentProvider;
       continue;
     }
 
-    if (entry.type === "model_change") {
-      const modelChange = entry as OpenClawModelChangeEntry;
-      currentModel = modelChange.modelId ?? modelChange.model ?? currentModel;
-      currentProvider = modelChange.provider ?? currentProvider;
+    if (isModelChangeEntry(entry)) {
+      currentModel = entry.modelId ?? entry.model ?? currentModel;
+      currentProvider = entry.provider ?? currentProvider;
       continue;
     }
 
-    if (entry.type === "compaction") {
+    if (isCompactionEntry(entry)) {
       compactionCount += 1;
       continue;
     }
 
-    if (entry.type !== "message") {
+    if (!isMessageEntry(entry)) {
       continue;
     }
 
-    const messageEntry = entry as OpenClawMessageEntry;
+    const messageEntry = entry;
     const role = messageEntry.message.role;
 
     if (role === "user") {
@@ -267,13 +301,20 @@ export function normalizeSession(
       continue;
     }
 
-    if (role === "assistant") {
-      const assistantMessage = messageEntry.message as OpenClawAssistantMessage;
+    if (isAssistantMessage(messageEntry.message)) {
+      const assistantMessage = messageEntry.message;
       const model = assistantMessage.model ?? currentModel ?? sessionHeader?.modelId;
       const provider = assistantMessage.provider ?? currentProvider ?? sessionHeader?.provider;
       const assistantContent = flattenContent(assistantMessage.content);
-      const pendingUserContent = pendingUserEntries.map((pending) => flattenContent(pending.message.content)).join("\n");
-      const usageTotals = getUsageTotals(assistantMessage.usage, model, pendingUserContent, assistantContent);
+      const pendingUserContent = pendingUserEntries
+        .map((pending) => flattenContent(pending.message.content))
+        .join("\n");
+      const usageTotals = getUsageTotals(
+        assistantMessage.usage,
+        model,
+        pendingUserContent,
+        assistantContent,
+      );
 
       currentModel = model ?? currentModel;
       currentProvider = provider ?? currentProvider;
@@ -281,7 +322,8 @@ export function normalizeSession(
       const spanId = toLlmSpanId(traceId, llmIndex);
       const inputTokens = assistantMessage.usage?.input ?? estimateTokenCount(pendingUserContent);
       const outputTokens = assistantMessage.usage?.output ?? estimateTokenCount(assistantContent);
-      const spanStatus = assistantMessage.errorMessage || assistantMessage.stopReason === "error" ? "error" : "ok";
+      const spanStatus =
+        assistantMessage.errorMessage || assistantMessage.stopReason === "error" ? "error" : "ok";
 
       totalInputTokens += inputTokens;
       totalOutputTokens += outputTokens;
@@ -318,17 +360,20 @@ export function normalizeSession(
         errorMessage: assistantMessage.errorMessage ?? null,
         metadata: {
           api: assistantMessage.api ?? null,
+          cacheRead: assistantMessage.usage?.cacheRead ?? null,
+          cacheWrite: assistantMessage.usage?.cacheWrite ?? null,
           estimatedUsage: usageTotals.estimated,
-          stopReason: assistantMessage.stopReason ?? null
-        }
+          stopReason: assistantMessage.stopReason ?? null,
+          totalTokens: assistantMessage.usage?.totalTokens ?? null,
+        },
       });
 
       for (const pendingUserEntry of pendingUserEntries) {
         const userContent = flattenContent(pendingUserEntry.message.content);
         messages.push(
           buildMessage(spanId, traceId, "user", userContent, nextPosition(spanId), {
-            timestamp: extractEntryTimestamp(pendingUserEntry)?.toISOString() ?? null
-          })
+            timestamp: extractEntryTimestamp(pendingUserEntry)?.toISOString() ?? null,
+          }),
         );
       }
 
@@ -337,8 +382,8 @@ export function normalizeSession(
         buildMessage(spanId, traceId, "assistant", assistantContent, nextPosition(spanId), {
           api: assistantMessage.api ?? null,
           stopReason: assistantMessage.stopReason ?? null,
-          timestamp: timestamp.toISOString()
-        })
+          timestamp: timestamp.toISOString(),
+        }),
       );
 
       for (const toolCall of extractToolCalls(assistantMessage.content)) {
@@ -368,8 +413,8 @@ export function normalizeSession(
           status: "ok",
           errorMessage: null,
           metadata: {
-            toolCallId
-          }
+            toolCallId,
+          },
         });
       }
 
@@ -377,8 +422,8 @@ export function normalizeSession(
       continue;
     }
 
-    if (role === "toolResult") {
-      const toolResult = messageEntry.message as OpenClawToolResultMessage;
+    if (isToolResultMessage(messageEntry.message)) {
+      const toolResult = messageEntry.message;
       const toolCallId = toolResult.toolCallId ?? `orphan:${++orphanToolIndex}`;
       const toolSpanId = toolSpanIdsByCallId.get(toolCallId) ?? toToolSpanId(traceId, toolCallId);
       const existingSpanIndex = spanIndexesById.get(toolSpanId);
@@ -406,10 +451,14 @@ export function normalizeSession(
           toolSuccess: !(toolResult.isError ?? false),
           status: toolResult.isError ? "error" : "ok",
           errorMessage: toolResult.isError ? content || "Tool call failed" : null,
-          metadata: toolResult.details ?? null
+          metadata: toolResult.details ?? null,
         });
       } else {
         const existingSpan = spans[existingSpanIndex];
+        if (!existingSpan) {
+          continue;
+        }
+
         replaceSpan({
           ...existingSpan,
           endedAt: timestamp,
@@ -417,8 +466,10 @@ export function normalizeSession(
           toolOutput: content || existingSpan.toolOutput,
           toolSuccess: !(toolResult.isError ?? false),
           status: toolResult.isError ? "error" : existingSpan.status,
-          errorMessage: toolResult.isError ? content || "Tool call failed" : existingSpan.errorMessage,
-          metadata: toolResult.details ?? existingSpan.metadata
+          errorMessage: toolResult.isError
+            ? content || "Tool call failed"
+            : existingSpan.errorMessage,
+          metadata: toolResult.details ?? existingSpan.metadata,
         });
       }
 
@@ -434,8 +485,8 @@ export function normalizeSession(
         buildMessage(toolSpanId, traceId, "tool", content, nextPosition(toolSpanId), {
           isError: toolResult.isError ?? false,
           timestamp: timestamp.toISOString(),
-          toolName: toolResult.toolName ?? null
-        })
+          toolName: toolResult.toolName ?? null,
+        }),
       );
     }
   }
@@ -448,19 +499,20 @@ export function normalizeSession(
     parseTimestamp(sessionHeader?.timestamp) ??
     extractEntryTimestamp(readResult.entries[0] ?? { type: "unknown" }) ??
     sessionFile.modifiedAt;
+  const traceModel = currentModel ?? sessionHeader?.modelId;
 
   const trace: TraceRecord = {
     id: traceId,
     externalId: sessionHeader?.id ?? sessionFile.sessionId,
     source: "openclaw",
     sessionKey: sessionHeader?.id ?? sessionFile.sessionId,
-    agentId: sessionFile.agentId ?? null,
+    ...(sessionFile.agentId ? { agentId: sessionFile.agentId } : {}),
     startedAt,
     endedAt: lastActivityAt,
     totalInputTokens,
     totalOutputTokens,
     totalCostUsd,
-    model: currentModel ?? sessionHeader?.modelId ?? null,
+    ...(traceModel ? { model: traceModel } : {}),
     status: hasError ? "error" : isPartial ? "partial" : "complete",
     metadata: {
       branchedFrom: sessionHeader?.branchedFrom ?? null,
@@ -468,15 +520,15 @@ export function normalizeSession(
       cwd: sessionHeader?.cwd ?? null,
       provider: currentProvider ?? sessionHeader?.provider ?? null,
       sourceFile: sessionFile.filePath,
-      thinkingLevel: sessionHeader?.thinkingLevel ?? null
+      thinkingLevel: sessionHeader?.thinkingLevel ?? null,
     },
-    ingestedAt: new Date()
+    ingestedAt: new Date(),
   };
 
   return {
     trace,
     spans,
     messages,
-    errors
+    errors,
   };
 }

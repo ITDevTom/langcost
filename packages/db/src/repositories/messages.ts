@@ -11,7 +11,7 @@ function toRow(record: MessageRecord): MessageRecord {
   return {
     ...record,
     tokenCount: record.tokenCount ?? null,
-    metadata: record.metadata ?? null
+    metadata: record.metadata ?? null,
   };
 }
 
@@ -34,8 +34,8 @@ export function createMessageRepository(db: Db) {
             content: row.content,
             tokenCount: row.tokenCount,
             position: row.position,
-            metadata: row.metadata
-          }
+            metadata: row.metadata,
+          },
         })
         .run();
     },
@@ -50,7 +50,7 @@ export function createMessageRepository(db: Db) {
           sql`json_extract(${messages.metadata}, '$.timestamp')`,
           asc(spans.startedAt),
           asc(messages.position),
-          asc(messages.id)
+          asc(messages.id),
         )
         .all()
         .map((row) => fromRow(row.message));
@@ -67,6 +67,6 @@ export function createMessageRepository(db: Db) {
     count(): number {
       const row = db.select({ count: count() }).from(messages).get();
       return numeric(row?.count);
-    }
+    },
   };
 }

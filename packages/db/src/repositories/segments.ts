@@ -1,5 +1,5 @@
 import type { SegmentType } from "@langcost/core";
-import { asc, count, desc, eq, sql } from "drizzle-orm";
+import { asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 
 import type { Db } from "../client";
 import { segments } from "../schema";
@@ -13,7 +13,7 @@ function toRow(record: SegmentRecord): SegmentRecord {
     ...record,
     contentHash: record.contentHash ?? null,
     charStart: record.charStart ?? null,
-    charEnd: record.charEnd ?? null
+    charEnd: record.charEnd ?? null,
   };
 }
 
@@ -39,20 +39,44 @@ export function createSegmentRepository(db: Db) {
             contentHash: row.contentHash,
             charStart: row.charStart,
             charEnd: row.charEnd,
-            analyzedAt: row.analyzedAt
-          }
+            analyzedAt: row.analyzedAt,
+          },
         })
         .run();
     },
     listByTraceId(traceId: string): SegmentRow[] {
-      return db.select().from(segments).where(eq(segments.traceId, traceId)).orderBy(asc(segments.analyzedAt)).all().map(fromRow);
+      return db
+        .select()
+        .from(segments)
+        .where(eq(segments.traceId, traceId))
+        .orderBy(asc(segments.analyzedAt))
+        .all()
+        .map(fromRow);
+    },
+    deleteByTraceIds(traceIds: string[]): void {
+      if (traceIds.length === 0) {
+        return;
+      }
+
+      const [firstTraceId] = traceIds;
+      if (!firstTraceId) {
+        return;
+      }
+
+      db.delete(segments)
+        .where(
+          traceIds.length === 1
+            ? eq(segments.traceId, firstTraceId)
+            : inArray(segments.traceId, traceIds),
+        )
+        .run();
     },
     summarizeByType(): Array<{ type: SegmentType; totalTokens: number; totalCostUsd: number }> {
       return db
         .select({
           type: segments.type,
           totalTokens: sql<number>`coalesce(sum(${segments.tokenCount}), 0)`,
-          totalCostUsd: sql<number>`coalesce(sum(${segments.costUsd}), 0)`
+          totalCostUsd: sql<number>`coalesce(sum(${segments.costUsd}), 0)`,
         })
         .from(segments)
         .groupBy(segments.type)
@@ -61,12 +85,12 @@ export function createSegmentRepository(db: Db) {
         .map((row) => ({
           type: row.type,
           totalTokens: numeric(row.totalTokens),
-          totalCostUsd: numeric(row.totalCostUsd)
+          totalCostUsd: numeric(row.totalCostUsd),
         }));
     },
     count(): number {
       const row = db.select({ count: count() }).from(segments).get();
       return numeric(row?.count);
-    }
+    },
   };
 }

@@ -6,5 +6,5 @@ export const ingestionState = sqliteTable("ingestion_state", {
   lastOffset: integer("last_offset").notNull(),
   lastLineHash: text("last_line_hash"),
   lastSessionId: text("last_session_id"),
-  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull()
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
 });

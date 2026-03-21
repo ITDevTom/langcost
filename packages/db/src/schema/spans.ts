@@ -6,7 +6,7 @@ import {
   integer,
   real,
   sqliteTable,
-  text
+  text,
 } from "drizzle-orm/sqlite-core";
 
 import { traces } from "./traces";
@@ -22,7 +22,7 @@ export const spans = sqliteTable(
       .notNull()
       .references(() => traces.id, { onDelete: "cascade" }),
     parentSpanId: text("parent_span_id").references((): AnySQLiteColumn => spans.id, {
-      onDelete: "set null"
+      onDelete: "set null",
     }),
     externalId: text("external_id").notNull(),
     type: text("type", { enum: spanTypeValues }).notNull(),
@@ -41,11 +41,11 @@ export const spans = sqliteTable(
     toolSuccess: integer("tool_success", { mode: "boolean" }),
     status: text("status", { enum: spanStatusValues }).notNull(),
     errorMessage: text("error_message"),
-    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown> | null>()
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown> | null>(),
   },
   (table) => [
     index("idx_spans_trace_id").on(table.traceId),
     check("spans_type_check", sql`${table.type} in ('llm', 'tool', 'retrieval', 'agent')`),
-    check("spans_status_check", sql`${table.status} in ('ok', 'error')`)
-  ]
+    check("spans_status_check", sql`${table.status} in ('ok', 'error')`),
+  ],
 );

@@ -10,7 +10,7 @@ const faultTypeValues = [
   "tool_failure",
   "loop",
   "timeout",
-  "unknown"
+  "unknown",
 ] as const;
 
 export const faultReports = sqliteTable(
@@ -24,19 +24,19 @@ export const faultReports = sqliteTable(
       .notNull()
       .references(() => spans.id, { onDelete: "cascade" }),
     rootCauseSpanId: text("root_cause_span_id").references(() => spans.id, {
-      onDelete: "set null"
+      onDelete: "set null",
     }),
     faultType: text("fault_type", { enum: faultTypeValues }).notNull(),
     description: text("description").notNull(),
     cascadeDepth: integer("cascade_depth").notNull(),
     affectedSpanIds: text("affected_span_ids", { mode: "json" }).$type<string[]>().notNull(),
-    detectedAt: integer("detected_at", { mode: "timestamp_ms" }).notNull()
+    detectedAt: integer("detected_at", { mode: "timestamp_ms" }).notNull(),
   },
   (table) => [
     index("idx_fault_reports_trace_id").on(table.traceId),
     check(
       "fault_reports_fault_type_check",
-      sql`${table.faultType} in ('upstream_data', 'model_error', 'tool_failure', 'loop', 'timeout', 'unknown')`
-    )
-  ]
+      sql`${table.faultType} in ('upstream_data', 'model_error', 'tool_failure', 'loop', 'timeout', 'unknown')`,
+    ),
+  ],
 );

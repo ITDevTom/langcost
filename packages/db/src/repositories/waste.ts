@@ -1,5 +1,5 @@
 import type { WasteCategory } from "@langcost/core";
-import { count, desc, eq, sql } from "drizzle-orm";
+import { count, desc, eq, inArray, sql } from "drizzle-orm";
 
 import type { Db } from "../client";
 import { wasteReports } from "../schema";
@@ -12,7 +12,7 @@ function toRow(record: WasteReportRecord): WasteReportRecord {
   return {
     ...record,
     spanId: record.spanId ?? null,
-    estimatedSavingsUsd: record.estimatedSavingsUsd ?? null
+    estimatedSavingsUsd: record.estimatedSavingsUsd ?? null,
   };
 }
 
@@ -39,13 +39,18 @@ export function createWasteReportRepository(db: Db) {
             recommendation: row.recommendation,
             estimatedSavingsUsd: row.estimatedSavingsUsd,
             evidence: row.evidence,
-            detectedAt: row.detectedAt
-          }
+            detectedAt: row.detectedAt,
+          },
         })
         .run();
     },
     list(): WasteReportRow[] {
-      return db.select().from(wasteReports).orderBy(desc(wasteReports.detectedAt)).all().map(fromRow);
+      return db
+        .select()
+        .from(wasteReports)
+        .orderBy(desc(wasteReports.detectedAt))
+        .all()
+        .map(fromRow);
     },
     listByTraceId(traceId: string): WasteReportRow[] {
       return db
@@ -55,6 +60,20 @@ export function createWasteReportRepository(db: Db) {
         .orderBy(desc(wasteReports.detectedAt))
         .all()
         .map(fromRow);
+    },
+    deleteByTraceIds(traceIds: string[]): void {
+      if (traceIds.length === 0) {
+        return;
+      }
+
+      const [firstTraceId] = traceIds;
+      db.delete(wasteReports)
+        .where(
+          traceIds.length === 1 && firstTraceId
+            ? eq(wasteReports.traceId, firstTraceId)
+            : inArray(wasteReports.traceId, traceIds),
+        )
+        .run();
     },
     summarizeByCategory(): Array<{
       category: WasteCategory;
@@ -67,7 +86,7 @@ export function createWasteReportRepository(db: Db) {
           category: wasteReports.category,
           count: count(),
           totalWastedTokens: sql<number>`coalesce(sum(${wasteReports.wastedTokens}), 0)`,
-          totalWastedCostUsd: sql<number>`coalesce(sum(${wasteReports.wastedCostUsd}), 0)`
+          totalWastedCostUsd: sql<number>`coalesce(sum(${wasteReports.wastedCostUsd}), 0)`,
         })
         .from(wasteReports)
         .groupBy(wasteReports.category)
@@ -77,8 +96,8 @@ export function createWasteReportRepository(db: Db) {
           category: row.category,
           count: numeric(row.count),
           totalWastedTokens: numeric(row.totalWastedTokens),
-          totalWastedCostUsd: numeric(row.totalWastedCostUsd)
+          totalWastedCostUsd: numeric(row.totalWastedCostUsd),
         }));
-    }
+    },
   };
 }
