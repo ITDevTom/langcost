@@ -17,3 +17,9 @@ AGENTS.md
 .cursor/
 .claude/
 .codex/
+
+# Internal docs — keep local, not on GitHub
+SPEC.md
+PRODUCT.md
+TODO.md
+.github/CONTRIBUTING.md
