@@ -72,39 +72,24 @@ export function Overview({ refreshToken, onNavigate }: OverviewProps) {
 
   return (
     <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-6">
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[
-          {
-            label: "Total Cost",
-            value: formatUsd(overview.totalCostUsd),
-            detail: `${overview.costByModel.length} models observed`,
-            tone: "summary-card--blue",
-          },
-          {
-            label: "Actionable Waste",
-            value: formatUsd(overview.totalWastedUsd),
-            detail: formatPercent(overview.wastePercentage),
-            tone: "summary-card--rose",
-          },
-          {
-            label: "Sessions",
-            value: `${overview.totalTraces}`,
-            detail: `${overview.tracesWithWaste} with waste findings`,
-            tone: "summary-card--green",
-          },
-          {
-            label: "Last Scan",
-            value: formatRelativeTime(overview.lastScanAt),
-            detail: overview.lastScanAt ?? "No scans yet",
-            tone: "summary-card--amber",
-          },
-        ].map((card) => (
-          <div key={card.label} className={`summary-card ${card.tone}`}>
-            <div className="summary-label">{card.label}</div>
-            <div className="summary-value">{card.value}</div>
-            <div className="summary-detail">{card.detail}</div>
-          </div>
-        ))}
+      <section className="stat-strip">
+        <span className="stat-strip__item">
+          <span className="stat-strip__label">Total:</span> {formatUsd(overview.totalCostUsd)}
+        </span>
+        <span className="stat-strip__separator">|</span>
+        <span className="stat-strip__item">
+          <span className="stat-strip__label">Waste:</span> {formatUsd(overview.totalWastedUsd)} (
+          {formatPercent(overview.wastePercentage)})
+        </span>
+        <span className="stat-strip__separator">|</span>
+        <span className="stat-strip__item">
+          <span className="stat-strip__label">Sessions:</span> {overview.totalTraces}
+        </span>
+        <span className="stat-strip__separator">|</span>
+        <span className="stat-strip__item">
+          <span className="stat-strip__label">Last scan:</span>{" "}
+          {formatRelativeTime(overview.lastScanAt)}
+        </span>
       </section>
 
       <section className="panel p-5">
@@ -168,17 +153,14 @@ export function Overview({ refreshToken, onNavigate }: OverviewProps) {
             Informational only. Model mix is separate from actionable waste.
           </p>
 
-          <div className="mt-4 space-y-3">
-            {overview.costByModel.map((entry) => (
-              <div key={entry.model} className="soft-card">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="font-medium text-slate-100">{entry.model}</div>
-                    <div className="mt-1 text-sm text-slate-500">{entry.traceCount} traces</div>
-                  </div>
-                  <div className="text-right text-slate-100">{formatUsd(entry.costUsd)}</div>
-                </div>
-              </div>
+          <div className="model-usage-line mt-4">
+            {overview.costByModel.map((entry, index) => (
+              <span key={entry.model} className="model-usage-line__item">
+                {entry.model}: {entry.traceCount} sessions {formatUsd(entry.costUsd)}
+                {index < overview.costByModel.length - 1 ? (
+                  <span className="model-usage-line__separator">|</span>
+                ) : null}
+              </span>
             ))}
           </div>
         </div>

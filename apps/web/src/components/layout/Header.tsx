@@ -25,12 +25,19 @@ export function Header({
 }: HeaderProps) {
   return (
     <header className="site-header fixed inset-x-0 top-0 z-20 border-b border-[color:var(--border)] backdrop-blur">
-      <div className="flex w-full items-center justify-between gap-4 px-4 py-4 sm:px-6 xl:px-10">
-        <div className="flex items-center gap-4">
+      <div className="mx-auto flex w-full max-w-[1480px] items-center justify-between gap-4 px-4 py-3 sm:px-6 xl:px-10">
+        <div className="flex items-center gap-5">
           <button type="button" onClick={() => onNavigate("/")} className="header-brand">
-            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-[color:var(--accent-blue)]" />
-            <span className="text-sm font-semibold tracking-[0.18em] text-slate-100 uppercase">
-              langcost
+            <img
+              src="/logo.svg"
+              alt=""
+              className="h-7 w-7"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+            <span className="text-[15px] font-bold tracking-[-0.01em]" style={{ color: "var(--text-primary)" }}>
+              Lang<span style={{ color: "var(--accent-orange, #ff6b00)" }}>Cost</span>
             </span>
           </button>
 

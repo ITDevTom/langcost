@@ -112,52 +112,36 @@ export function Sessions({ refreshToken, onNavigate }: SessionsProps) {
   return (
     <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5">
       {overview ? (
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            {
-              label: "Total Cost",
-              value: formatUsd(overview.totalCostUsd),
-              detail: `${overview.costByModel.length} models observed`,
-              tone: "summary-card--blue",
-            },
-            {
-              label: "Actionable Waste",
-              value: formatUsd(overview.totalWastedUsd),
-              detail: formatPercent(overview.wastePercentage),
-              tone: "summary-card--rose",
-            },
-            {
-              label: "Sessions",
-              value: `${overview.totalTraces}`,
-              detail: `${overview.tracesWithWaste} with waste findings`,
-              tone: "summary-card--green",
-            },
-            {
-              label: "Last Scan",
-              value: formatRelativeTime(overview.lastScanAt),
-              detail: overview.lastScanAt ?? "No scans yet",
-              tone: "summary-card--amber",
-            },
-          ].map((card) => (
-            <div key={card.label} className={`summary-card ${card.tone}`}>
-              <div className="summary-label">{card.label}</div>
-              <div className="summary-value">{card.value}</div>
-              <div className="summary-detail">{card.detail}</div>
-            </div>
-          ))}
+        <section className="stat-strip">
+          <span className="stat-strip__item">
+            <span className="stat-strip__label">Total:</span> {formatUsd(overview.totalCostUsd)}
+          </span>
+          <span className="stat-strip__separator">|</span>
+          <span className="stat-strip__item">
+            <span className="stat-strip__label">Waste:</span> {formatUsd(overview.totalWastedUsd)} (
+            {formatPercent(overview.wastePercentage)})
+          </span>
+          <span className="stat-strip__separator">|</span>
+          <span className="stat-strip__item">
+            <span className="stat-strip__label">Sessions:</span> {overview.totalTraces}
+          </span>
+          <span className="stat-strip__separator">|</span>
+          <span className="stat-strip__item">
+            <span className="stat-strip__label">Last scan:</span>{" "}
+            {formatRelativeTime(overview.lastScanAt)}
+          </span>
         </section>
       ) : null}
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="section-kicker">Trace Explorer</div>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-50">Traces</h1>
-          <p className="section-copy mt-2 text-sm">
-            Expand a trace to inspect waste findings and the execution timeline.
-          </p>
-        </div>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+          Traces
+          <span className="ml-2 text-sm font-normal" style={{ color: "var(--text-muted)" }}>
+            ({total})
+          </span>
+        </h1>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm text-slate-400">
             <span className="mr-2">Sort</span>
             <select
