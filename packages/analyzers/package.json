@@ -1,11 +1,15 @@
 {
   "name": "@langcost/analyzers",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "type": "module",
+  "publishConfig": { "access": "public" },
   "files": ["src"],
   "exports": {
     ".": "./src/index.ts"
   },
+  "description": "Cost analysis and waste detection for langcost",
+  "license": "AGPL-3.0",
+  "repository": { "type": "git", "url": "https://github.com/vjvkrm/langcost", "directory": "packages/analyzers" },
   "scripts": {
     "test": "bun test"
   },

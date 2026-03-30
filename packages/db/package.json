@@ -1,11 +1,15 @@
 {
   "name": "@langcost/db",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "type": "module",
+  "publishConfig": { "access": "public" },
   "files": ["src", "drizzle"],
   "exports": {
     ".": "./src/index.ts"
   },
+  "description": "Database schema and repositories for langcost",
+  "license": "AGPL-3.0",
+  "repository": { "type": "git", "url": "https://github.com/vjvkrm/langcost", "directory": "packages/db" },
   "scripts": {
     "test": "bun test",
     "db:generate": "drizzle-kit generate",
