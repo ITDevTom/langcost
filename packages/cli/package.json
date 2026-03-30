@@ -1,10 +1,11 @@
 {
   "name": "@langcost/cli",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "type": "module",
   "bin": {
     "langcost": "./src/index.ts"
   },
+  "files": ["src"],
   "exports": {
     ".": "./src/index.ts"
   },
