@@ -582,6 +582,7 @@ export function normalizeConversation(
       totalDurationMs,
       totalCacheCreationTokens,
       totalCacheReadTokens,
+      interactive: true,
       sourceFile: conversationFile.filePath,
       parentConversationId: conversationFile.parentConversationId ?? null,
       subagentId: conversationFile.subagentId ?? null,

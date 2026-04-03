@@ -20,6 +20,7 @@ export function createTracesRoute(options: { dbPath?: string } = {}) {
     const since = c.req.query("since");
     const model = c.req.query("model");
     const status = c.req.query("status");
+    const source = c.req.query("source");
 
     const payload = await withDb(options.dbPath, (db) => {
       const traceRepository = createTraceRepository(db);
@@ -30,6 +31,10 @@ export function createTracesRoute(options: { dbPath?: string } = {}) {
       let traces = traceRepository.listForAnalysis({
         ...(since ? { since: new Date(since) } : {}),
       });
+
+      if (source) {
+        traces = traces.filter((trace) => trace.source === source);
+      }
 
       if (model) {
         traces = traces.filter((trace) => trace.model === model);

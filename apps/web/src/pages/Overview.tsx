@@ -7,14 +7,16 @@ import {
   type Recommendation,
 } from "../api/client";
 import { CostTimeline } from "../components/charts/CostTimeline";
-import { formatPercent, formatRelativeTime, formatUsd } from "../lib/format";
+import { formatCompactInt, formatPercent, formatRelativeTime, formatUsd } from "../lib/format";
 
 interface OverviewProps {
   refreshToken: number;
   onNavigate: (path: string) => void;
+  source?: string;
+  billingMode: "subscription" | "api";
 }
 
-export function Overview({ refreshToken, onNavigate }: OverviewProps) {
+export function Overview({ refreshToken, onNavigate, source, billingMode }: OverviewProps) {
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +32,7 @@ export function Overview({ refreshToken, onNavigate }: OverviewProps) {
 
       try {
         const [overviewResponse, recommendationResponse] = await Promise.all([
-          getOverview(),
+          getOverview(source),
           getRecommendations(),
         ]);
 
@@ -56,7 +58,7 @@ export function Overview({ refreshToken, onNavigate }: OverviewProps) {
     return () => {
       active = false;
     };
-  }, [refreshToken]);
+  }, [refreshToken, source]);
 
   if (loading) {
     return <div className="panel p-8 text-sm text-slate-400">Loading overview...</div>;
@@ -70,20 +72,46 @@ export function Overview({ refreshToken, onNavigate }: OverviewProps) {
     return <div className="panel p-8 text-sm text-slate-500">No overview data available.</div>;
   }
 
+  const isApi = billingMode === "api";
+  const totalTokens = overview.costByModel.reduce(
+    (sum, m) => sum + (m.inputTokens ?? 0) + (m.outputTokens ?? 0), 0,
+  );
+  const sr = overview.successRate ?? { complete: 0, error: 0, partial: 0, completePercent: 0 };
+  const turns = overview.turns ?? { avg: 0, min: 0, max: 0, total: 0 };
+
   return (
     <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-6">
       <section className="stat-strip">
-        <span className="stat-strip__item">
-          <span className="stat-strip__label">Total:</span> {formatUsd(overview.totalCostUsd)}
-        </span>
-        <span className="stat-strip__separator">|</span>
-        <span className="stat-strip__item">
-          <span className="stat-strip__label">Waste:</span> {formatUsd(overview.totalWastedUsd)} (
-          {formatPercent(overview.wastePercentage)})
-        </span>
-        <span className="stat-strip__separator">|</span>
+        {isApi ? (
+          <>
+            <span className="stat-strip__item">
+              <span className="stat-strip__label">Total:</span> {formatUsd(overview.totalCostUsd)}
+            </span>
+            <span className="stat-strip__separator">|</span>
+            <span className="stat-strip__item">
+              <span className="stat-strip__label">Waste:</span> {formatUsd(overview.totalWastedUsd)} (
+              {formatPercent(overview.wastePercentage)})
+            </span>
+            <span className="stat-strip__separator">|</span>
+          </>
+        ) : null}
         <span className="stat-strip__item">
           <span className="stat-strip__label">Sessions:</span> {overview.totalTraces}
+        </span>
+        <span className="stat-strip__separator">|</span>
+        <span className="stat-strip__item">
+          <span className="stat-strip__label">Tokens:</span> {formatCompactInt(totalTokens)}
+        </span>
+        <span className="stat-strip__separator">|</span>
+        <span className="stat-strip__item">
+          <span className="stat-strip__label">Success:</span>{" "}
+          <span style={{ color: sr.completePercent >= 50 ? "var(--accent-green)" : "var(--accent-red)" }}>
+            {formatPercent(sr.completePercent)}
+          </span>
+        </span>
+        <span className="stat-strip__separator">|</span>
+        <span className="stat-strip__item">
+          <span className="stat-strip__label">Avg turns:</span> {turns.avg}
         </span>
         <span className="stat-strip__separator">|</span>
         <span className="stat-strip__item">
@@ -92,14 +120,67 @@ export function Overview({ refreshToken, onNavigate }: OverviewProps) {
         </span>
       </section>
 
-      <section className="panel p-5">
-        <div className="mb-4">
-          <div className="section-kicker">Daily Trend</div>
-          <h2 className="text-lg font-semibold text-slate-100">Cost by Day</h2>
-          <p className="section-copy mt-1 text-sm">Daily cost with actionable waste overlay</p>
-        </div>
-        <CostTimeline data={overview.costByDay} />
-      </section>
+      {isApi ? (
+        <section className="panel p-5">
+          <div className="mb-4">
+            <div className="section-kicker">Daily Trend</div>
+            <h2 className="text-lg font-semibold text-slate-100">Cost by Day</h2>
+            <p className="section-copy mt-1 text-sm">Daily cost with actionable waste overlay</p>
+          </div>
+          <CostTimeline data={overview.costByDay} />
+        </section>
+      ) : null}
+
+      {overview.byProject?.length > 0 ? (
+        <section className="panel p-5">
+          <div className="mb-4">
+            <div className="section-kicker">Projects</div>
+            <h2 className="text-lg font-semibold text-slate-100">Project Comparison</h2>
+            <p className="section-copy mt-1 text-sm">
+              Token usage, efficiency, and success rate per project
+            </p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[color:var(--border)] text-xs tracking-[0.18em] text-slate-500 uppercase">
+                  <th className="px-3 py-2 text-left font-medium">Project</th>
+                  <th className="px-3 py-2 text-right font-medium">Sessions</th>
+                  <th className="px-3 py-2 text-right font-medium">Tokens</th>
+                  <th className="px-3 py-2 text-right font-medium">Avg turns</th>
+                  <th className="px-3 py-2 text-right font-medium">Success</th>
+                  {isApi ? <th className="px-3 py-2 text-right font-medium">Cost</th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {overview.byProject.map((p) => (
+                  <tr key={p.project} className="border-b border-[color:var(--border)] last:border-b-0">
+                    <td className="px-3 py-2.5 font-medium" style={{ color: "var(--accent-orange, #ff6b00)" }}>
+                      {p.project}
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-slate-300">{p.sessions}</td>
+                    <td className="px-3 py-2.5 text-right text-slate-300">
+                      <span title={`in: ${formatCompactInt(p.totalInputTokens)} | out: ${formatCompactInt(p.totalOutputTokens)}`}>
+                        {formatCompactInt(p.totalTokens)}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2.5 text-right text-slate-300">{p.avgTurns}</td>
+                    <td className="px-3 py-2.5 text-right">
+                      <span style={{ color: p.successRate >= 50 ? "var(--accent-green, #10b981)" : "var(--accent-red, #ef4444)" }}>
+                        {formatPercent(p.successRate)}
+                      </span>
+                    </td>
+                    {isApi ? (
+                      <td className="px-3 py-2.5 text-right text-slate-300">{formatUsd(p.totalCostUsd)}</td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <div className="panel p-5">
@@ -108,7 +189,7 @@ export function Overview({ refreshToken, onNavigate }: OverviewProps) {
               <div className="section-kicker">Actions</div>
               <h2 className="text-lg font-semibold text-slate-100">Top Recommendations</h2>
               <p className="section-copy mt-1 text-sm">
-                Actionable waste reductions ranked by estimated savings
+                Actionable insights from your sessions
               </p>
             </div>
             <button type="button" onClick={() => onNavigate("/")} className="button-ghost">
@@ -133,12 +214,14 @@ export function Overview({ refreshToken, onNavigate }: OverviewProps) {
                         {item.category} across {item.affectedTraces} traces
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm text-slate-500">Savings</div>
-                      <div className="mt-1 text-lg font-semibold text-emerald-300">
-                        {formatUsd(item.estimatedSavingsUsd)}
+                    {isApi ? (
+                      <div className="text-right">
+                        <div className="text-sm text-slate-500">Savings</div>
+                        <div className="mt-1 text-lg font-semibold text-emerald-300">
+                          {formatUsd(item.estimatedSavingsUsd)}
+                        </div>
                       </div>
-                    </div>
+                    ) : null}
                   </div>
                 </div>
               ))
@@ -147,21 +230,49 @@ export function Overview({ refreshToken, onNavigate }: OverviewProps) {
         </div>
 
         <div className="panel p-5">
-          <div className="section-kicker">Insight</div>
+          <div className="section-kicker">Distribution</div>
           <h2 className="text-lg font-semibold text-slate-100">Model Usage</h2>
           <p className="section-copy mt-1 text-sm">
-            Informational only. Model mix is separate from actionable waste.
+            Token distribution — can you delegate more to smaller models?
           </p>
 
-          <div className="model-usage-line mt-4">
-            {overview.costByModel.map((entry, index) => (
-              <span key={entry.model} className="model-usage-line__item">
-                {entry.model}: {entry.traceCount} sessions {formatUsd(entry.costUsd)}
-                {index < overview.costByModel.length - 1 ? (
-                  <span className="model-usage-line__separator">|</span>
-                ) : null}
-              </span>
-            ))}
+          <div className="mt-4 space-y-3">
+            {overview.costByModel.filter((m) => m.inputTokens + m.outputTokens > 0).map((entry) => {
+              const entryTokens = entry.inputTokens + entry.outputTokens;
+              const pct = totalTokens > 0 ? (entryTokens / totalTokens) * 100 : 0;
+              const shortModel = entry.model.replace("claude-", "").replace(/-20\d+/g, "");
+              const lower = entry.model.toLowerCase();
+              const barColor = lower.includes("opus") ? "#ff6b00" : lower.includes("sonnet") ? "#3b82f6" : lower.includes("haiku") ? "#10b981" : "#6b7280";
+              return (
+                <div key={entry.model} className="soft-card">
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <span className="text-sm font-medium text-slate-100">{shortModel}</span>
+                    <span className="text-sm text-slate-400">
+                      {entry.traceCount} sessions
+                      {isApi ? ` · ${formatUsd(entry.costUsd)}` : ""}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "var(--surface-alt)" }}>
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${Math.max(2, pct)}%`,
+                          backgroundColor: barColor,
+                        }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium text-slate-300 w-16 text-right">
+                      {formatPercent(pct)}
+                    </span>
+                  </div>
+                  <div className="flex gap-4 mt-1 text-xs text-slate-500">
+                    <span>in: {formatCompactInt(entry.inputTokens)}</span>
+                    <span>out: {formatCompactInt(entry.outputTokens)}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>

@@ -8,6 +8,7 @@ import { createOverviewRoute } from "./routes/overview";
 import { createScanRoute } from "./routes/scan";
 import { createSegmentsRoute } from "./routes/segments";
 import { createSettingsRoute } from "./routes/settings";
+import { createSourcesRoute } from "./routes/sources";
 import { createTracesRoute } from "./routes/traces";
 import { createWasteRoute } from "./routes/waste";
 
@@ -19,7 +20,17 @@ export interface ApiAppOptions {
 }
 
 function resolveWebDistPath(path?: string) {
-  return path ?? join(process.cwd(), "apps", "web", "dist");
+  if (path) return path;
+
+  // Resolve relative to this file's location (apps/api/src/index.ts → apps/web/dist)
+  const fromModule = new URL("../../web/dist", import.meta.url);
+  try {
+    if (fromModule.protocol === "file:") {
+      return fromModule.pathname;
+    }
+  } catch {}
+
+  return join(process.cwd(), "apps", "web", "dist");
 }
 
 function inferContentType(path: string): string | undefined {
@@ -78,6 +89,7 @@ export function createApiApp(options: ApiAppOptions = {}) {
 
   app.route("/api/v1/health", createHealthRoute(routeOptions));
   app.route("/api/v1/settings", createSettingsRoute(routeOptions));
+  app.route("/api/v1/sources", createSourcesRoute(routeOptions));
   app.route("/api/v1/overview", createOverviewRoute(routeOptions));
   app.route("/api/v1/traces", createTracesRoute(routeOptions));
   app.route("/api/v1/waste", createWasteRoute(routeOptions));

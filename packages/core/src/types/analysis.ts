@@ -11,7 +11,8 @@ export type WasteCategory =
   | "retry_waste"
   | "tool_failure_waste"
   | "high_output"
-  | "oversized_context";
+  | "oversized_context"
+  | "cache_expiry";
 
 export type Severity = "low" | "medium" | "high" | "critical";
 

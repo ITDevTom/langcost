@@ -10,16 +10,18 @@ import {
 } from "../api/client";
 import { SessionDetail } from "../components/tables/SessionDetail";
 import { SessionRow } from "../components/tables/SessionRow";
-import { formatPercent, formatRelativeTime, formatUsd } from "../lib/format";
+import { formatCompactInt, formatPercent, formatRelativeTime, formatUsd } from "../lib/format";
 
 interface SessionsProps {
   refreshToken: number;
   onNavigate: (path: string) => void;
+  source?: string;
+  billingMode: "subscription" | "api";
 }
 
 const PAGE_SIZE = 50;
 
-export function Sessions({ refreshToken, onNavigate }: SessionsProps) {
+export function Sessions({ refreshToken, onNavigate, source, billingMode }: SessionsProps) {
   const [traces, setTraces] = useState<TraceSummary[]>([]);
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [total, setTotal] = useState(0);
@@ -46,9 +48,10 @@ export function Sessions({ refreshToken, onNavigate }: SessionsProps) {
             limit: PAGE_SIZE,
             offset: (page - 1) * PAGE_SIZE,
             sort,
+            source,
             ...(statusFilter !== "all" ? { status: statusFilter } : {}),
           }),
-          getOverview(),
+          getOverview(source),
         ]);
 
         if (!active) {
@@ -74,7 +77,7 @@ export function Sessions({ refreshToken, onNavigate }: SessionsProps) {
     return () => {
       active = false;
     };
-  }, [page, refreshToken, sort, statusFilter]);
+  }, [page, refreshToken, sort, source, statusFilter]);
 
   async function toggleRow(traceId: string) {
     const nextExpanded = new Set(expandedIds);
@@ -107,24 +110,114 @@ export function Sessions({ refreshToken, onNavigate }: SessionsProps) {
     }
   }
 
+  const isClaudeCode = source === "claude-code";
+  const isApi = billingMode === "api";
+  const showCost = isApi;
+  const showCache = isApi && isClaudeCode;
+  const showWaste = isApi;
+
+  // Group subagent traces under their parent for claude-code
+  const { parentTraces, subagentsByParent } = (() => {
+    const parents: TraceSummary[] = [];
+    const subs = new Map<string, TraceSummary[]>();
+
+    for (const trace of traces) {
+      const parentId = (trace.metadata as Record<string, unknown> | null)?.parentConversationId as string | null;
+      if (parentId) {
+        const parentTraceId = `${trace.source}:trace:${parentId}`;
+        if (!subs.has(parentTraceId)) subs.set(parentTraceId, []);
+        subs.get(parentTraceId)!.push(trace);
+      } else {
+        parents.push(trace);
+      }
+    }
+
+    return { parentTraces: parents, subagentsByParent: subs };
+  })();
+
+  // Roll up subagent totals
+  function getCacheCost(trace: TraceSummary): number {
+    const meta = trace.metadata as Record<string, unknown> | null;
+    const readTokens = typeof meta?.totalCacheReadTokens === "number" ? meta.totalCacheReadTokens : 0;
+    const writeTokens = typeof meta?.totalCacheCreationTokens === "number" ? meta.totalCacheCreationTokens : 0;
+    return (readTokens / 1_000_000) * 0.5 + (writeTokens / 1_000_000) * 10;
+  }
+
+  interface ModelTokens { model: string; tokens: number }
+
+  function getModelBreakdown(trace: TraceSummary, subagents: TraceSummary[]): ModelTokens[] {
+    const byModel = new Map<string, number>();
+    const all = [trace, ...subagents];
+    for (const t of all) {
+      const model = t.model ?? "unknown";
+      const tokens = t.totalInputTokens + t.totalOutputTokens;
+      byModel.set(model, (byModel.get(model) ?? 0) + tokens);
+    }
+    return [...byModel.entries()]
+      .map(([model, tokens]) => ({ model, tokens }))
+      .sort((a, b) => b.tokens - a.tokens);
+  }
+
+  function getDisplayTrace(trace: TraceSummary): TraceSummary & { subagentCount: number; project?: string; cacheCost: number; modelBreakdown: ModelTokens[] } {
+    const subagents = subagentsByParent.get(trace.id) ?? [];
+    const project = (trace.metadata as Record<string, unknown> | null)?.project as string | undefined;
+    return {
+      ...trace,
+      totalInputTokens: trace.totalInputTokens + subagents.reduce((sum, sa) => sum + sa.totalInputTokens, 0),
+      totalOutputTokens: trace.totalOutputTokens + subagents.reduce((sum, sa) => sum + sa.totalOutputTokens, 0),
+      totalCostUsd: trace.totalCostUsd + subagents.reduce((sum, sa) => sum + sa.totalCostUsd, 0),
+      wasteUsd: trace.wasteUsd + subagents.reduce((sum, sa) => sum + sa.wasteUsd, 0),
+      spanCount: trace.spanCount + subagents.reduce((sum, sa) => sum + sa.spanCount, 0),
+      subagentCount: subagents.length,
+      project,
+      cacheCost: getCacheCost(trace) + subagents.reduce((sum, sa) => sum + getCacheCost(sa), 0),
+      modelBreakdown: getModelBreakdown(trace, subagents),
+    };
+  }
+
+  const displayTraces = parentTraces.map(getDisplayTrace);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const colSpan = (isClaudeCode ? 6 : 5) + (showCost ? 1 : 0) + (showCache ? 1 : 0) + (showWaste ? 1 : 0);
 
   return (
     <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5">
       {overview ? (
         <section className="stat-strip">
+          {showCost ? (
+            <>
+              <span className="stat-strip__item">
+                <span className="stat-strip__label">Total:</span> {formatUsd(overview.totalCostUsd)}
+              </span>
+              <span className="stat-strip__separator">|</span>
+              <span className="stat-strip__item">
+                <span className="stat-strip__label">Waste:</span> {formatUsd(overview.totalWastedUsd)} (
+                {formatPercent(overview.wastePercentage)})
+              </span>
+              <span className="stat-strip__separator">|</span>
+            </>
+          ) : null}
           <span className="stat-strip__item">
-            <span className="stat-strip__label">Total:</span> {formatUsd(overview.totalCostUsd)}
+            <span className="stat-strip__label">Sessions:</span> {parentTraces.length}
           </span>
-          <span className="stat-strip__separator">|</span>
-          <span className="stat-strip__item">
-            <span className="stat-strip__label">Waste:</span> {formatUsd(overview.totalWastedUsd)} (
-            {formatPercent(overview.wastePercentage)})
-          </span>
-          <span className="stat-strip__separator">|</span>
-          <span className="stat-strip__item">
-            <span className="stat-strip__label">Sessions:</span> {overview.totalTraces}
-          </span>
+          {showCache && (overview.totalCacheReadTokens > 0 || overview.totalCacheWriteTokens > 0) ? (() => {
+            const cacheReadCost = (overview.totalCacheReadTokens / 1_000_000) * 0.5;
+            const cacheWriteCost = (overview.totalCacheWriteTokens / 1_000_000) * 10;
+            const totalCacheCost = cacheReadCost + cacheWriteCost;
+            return (
+              <>
+                <span className="stat-strip__separator">|</span>
+                <span
+                  className="stat-strip__item"
+                  title={`Cache read: ${formatCompactInt(overview.totalCacheReadTokens)} tokens → ${formatUsd(cacheReadCost)}\nCache write: ${formatCompactInt(overview.totalCacheWriteTokens)} tokens → ${formatUsd(cacheWriteCost)}`}
+                >
+                  <span className="stat-strip__label">Cache:</span>{" "}
+                  <span style={{ color: "var(--text-muted)" }}>
+                    {formatUsd(totalCacheCost)}
+                  </span>
+                </span>
+              </>
+            );
+          })() : null}
           <span className="stat-strip__separator">|</span>
           <span className="stat-strip__item">
             <span className="stat-strip__label">Last scan:</span>{" "}
@@ -135,9 +228,9 @@ export function Sessions({ refreshToken, onNavigate }: SessionsProps) {
 
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
-          Traces
+          Sessions
           <span className="ml-2 text-sm font-normal" style={{ color: "var(--text-muted)" }}>
-            ({total})
+            ({parentTraces.length})
           </span>
         </h1>
 
@@ -181,36 +274,40 @@ export function Sessions({ refreshToken, onNavigate }: SessionsProps) {
         <div className="panel p-8 text-sm text-slate-400">Loading traces...</div>
       ) : error ? (
         <div className="panel p-8 text-sm text-red-300">{error}</div>
-      ) : traces.length === 0 ? (
+      ) : displayTraces.length === 0 ? (
         <div className="panel p-8 text-sm text-slate-500">No traces found yet.</div>
       ) : (
         <div className="table-shell overflow-hidden rounded-[28px] border border-[color:var(--border)] bg-[color:var(--surface)]">
           <div className="overflow-x-auto">
             <table className="trace-table min-w-[1160px] w-full table-fixed border-collapse">
               <colgroup>
-                <col style={{ width: "92px" }} />
-                <col style={{ width: "34%" }} />
-                <col style={{ width: "18%" }} />
-                <col style={{ width: "84px" }} />
-                <col style={{ width: "110px" }} />
-                <col style={{ width: "110px" }} />
-                <col style={{ width: "110px" }} />
-                <col style={{ width: "110px" }} />
+                <col style={{ width: "80px" }} />
+                {isClaudeCode ? <col style={{ width: "110px" }} /> : null}
+                <col />
+                <col style={{ width: "14%" }} />
+                <col style={{ width: "70px" }} />
+                <col style={{ width: "90px" }} />
+                <col style={{ width: "90px" }} />
+                {showCost ? <col style={{ width: "90px" }} /> : null}
+                {showCache ? <col style={{ width: "90px" }} /> : null}
+                {showWaste ? <col style={{ width: "90px" }} /> : null}
               </colgroup>
               <thead>
                 <tr className="border-b border-[color:var(--border)] text-xs tracking-[0.18em] text-slate-500 uppercase">
                   <th className="px-4 py-3 text-left font-medium">Status</th>
+                  {isClaudeCode ? <th className="px-4 py-3 text-left font-medium">Project</th> : null}
                   <th className="px-4 py-3 text-left font-medium">Session</th>
                   <th className="px-4 py-3 text-left font-medium">Model</th>
                   <th className="px-4 py-3 text-right font-medium">Spans</th>
                   <th className="px-4 py-3 text-right font-medium">Input</th>
                   <th className="px-4 py-3 text-right font-medium">Output</th>
-                  <th className="px-4 py-3 text-right font-medium">Cost</th>
-                  <th className="px-4 py-3 text-right font-medium">Waste</th>
+                  {showCost ? <th className="px-4 py-3 text-right font-medium">Cost</th> : null}
+                  {showCache ? <th className="px-4 py-3 text-right font-medium">Cache</th> : null}
+                  {showWaste ? <th className="px-4 py-3 text-right font-medium">Waste</th> : null}
                 </tr>
               </thead>
               <tbody>
-                {traces.map((trace) => {
+                {displayTraces.map((trace) => {
                   const expanded = expandedIds.has(trace.id);
                   return (
                     <Fragment key={trace.id}>
@@ -218,10 +315,18 @@ export function Sessions({ refreshToken, onNavigate }: SessionsProps) {
                         trace={trace}
                         expanded={expanded}
                         onToggle={() => void toggleRow(trace.id)}
+                        showProject={isClaudeCode}
+                        project={trace.project}
+                        subagentCount={trace.subagentCount}
+                        showCost={showCost}
+                        showCache={showCache}
+                        cacheCost={trace.cacheCost}
+                        showWaste={showWaste}
+                        modelBreakdown={trace.modelBreakdown}
                       />
                       {expanded ? (
-                        <tr>
-                          <td colSpan={8} className="p-0">
+                        <tr onClick={(e) => e.stopPropagation()}>
+                          <td colSpan={colSpan} className="p-0">
                             <SessionDetail
                               detail={details[trace.id] ?? null}
                               loading={loadingDetails.has(trace.id)}

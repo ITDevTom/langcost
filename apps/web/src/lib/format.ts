@@ -1,12 +1,11 @@
 import type { Severity, TraceStatus } from "../api/client";
 
 export function formatUsd(value: number): string {
-  const minimumFractionDigits = value >= 10 ? 2 : value >= 1 ? 3 : 4;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    minimumFractionDigits,
-    maximumFractionDigits: 4,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -130,6 +129,8 @@ export function formatCategoryLabel(category: string): string {
       return "agent loops";
     case "model_overuse":
       return "model insight";
+    case "cache_expiry":
+      return "cache expiry";
     default:
       return category.replaceAll("_", " ");
   }
