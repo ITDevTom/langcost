@@ -45,3 +45,49 @@ export function calculateCost(model: string, inputTokens: number, outputTokens: 
     totalCost: inputCost + outputCost,
   };
 }
+
+export function calculateCostWithCache(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+  cacheCreationTokens: number,
+  cacheReadTokens: number,
+  cacheDuration: "5m" | "1h" = "1h",
+) {
+  validateTokenCount(inputTokens, "inputTokens");
+  validateTokenCount(outputTokens, "outputTokens");
+  validateTokenCount(cacheCreationTokens, "cacheCreationTokens");
+  validateTokenCount(cacheReadTokens, "cacheReadTokens");
+
+  const pricing = findPricing(model);
+  if (!pricing) {
+    return {
+      inputCost: 0,
+      outputCost: 0,
+      cacheWriteCost: 0,
+      cacheReadCost: 0,
+      totalCost: 0,
+    };
+  }
+
+  const cacheWritePrice = cacheDuration === "1h"
+    ? pricing.cacheWrite1hInputPricePerMToken
+    : pricing.cacheWrite5mInputPricePerMToken;
+
+  const inputCost = (inputTokens / 1_000_000) * pricing.inputPricePerMToken;
+  const outputCost = (outputTokens / 1_000_000) * pricing.outputPricePerMToken;
+  const cacheWriteCost = cacheWritePrice
+    ? (cacheCreationTokens / 1_000_000) * cacheWritePrice
+    : 0;
+  const cacheReadCost = pricing.cachedInputPricePerMToken
+    ? (cacheReadTokens / 1_000_000) * pricing.cachedInputPricePerMToken
+    : 0;
+
+  return {
+    inputCost,
+    outputCost,
+    cacheWriteCost,
+    cacheReadCost,
+    totalCost: inputCost + outputCost + cacheWriteCost + cacheReadCost,
+  };
+}
