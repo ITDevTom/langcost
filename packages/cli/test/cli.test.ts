@@ -102,7 +102,7 @@ describe("langcost", () => {
     const exitCode = await main(["report", "--db", dbPath], runtime);
 
     expect(exitCode).toBe(0);
-    expect(stdout.join("")).toContain("Trace");
+    expect(stdout.join("")).toContain("Project");
     expect(stdout.join("")).toContain("Cost");
   });
 

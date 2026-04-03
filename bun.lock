@@ -38,9 +38,17 @@
         "@vitejs/plugin-react": "^6.0.1",
       },
     },
+    "packages/adapter-claude-code": {
+      "name": "@langcost/adapter-claude-code",
+      "version": "0.1.0",
+      "dependencies": {
+        "@langcost/core": "workspace:*",
+        "@langcost/db": "workspace:*",
+      },
+    },
     "packages/adapter-openclaw": {
       "name": "@langcost/adapter-openclaw",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "dependencies": {
         "@langcost/core": "workspace:*",
         "@langcost/db": "workspace:*",
@@ -48,7 +56,7 @@
     },
     "packages/analyzers": {
       "name": "@langcost/analyzers",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "dependencies": {
         "@langcost/core": "workspace:*",
         "@langcost/db": "workspace:*",
@@ -56,7 +64,7 @@
     },
     "packages/cli": {
       "name": "langcost",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "bin": {
         "langcost": "./src/index.ts",
       },
@@ -68,11 +76,11 @@
     },
     "packages/core": {
       "name": "@langcost/core",
-      "version": "0.1.2",
+      "version": "0.1.3",
     },
     "packages/db": {
       "name": "@langcost/db",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "dependencies": {
         "@langcost/core": "workspace:*",
         "drizzle-orm": "^0.45.1",
@@ -174,6 +182,8 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
+
+    "@langcost/adapter-claude-code": ["@langcost/adapter-claude-code@workspace:packages/adapter-claude-code"],
 
     "@langcost/adapter-openclaw": ["@langcost/adapter-openclaw@workspace:packages/adapter-openclaw"],
 

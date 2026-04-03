@@ -6,7 +6,7 @@ import type {
   WasteReportRecord,
 } from "@langcost/db";
 
-const INFORMATIONAL_WASTE_CATEGORIES = new Set(["model_overuse"]);
+const INFORMATIONAL_WASTE_CATEGORIES = new Set(["model_overuse", "cache_expiry"]);
 
 export function toDateKey(value: Date): string {
   return value.toISOString().slice(0, 10);
@@ -75,7 +75,11 @@ export function getTopSpans(spans: SpanRecord[], limit: number): SpanRecord[] {
     .slice(0, limit);
 }
 
-export function buildOverviewPayload(traces: TraceRecord[], wasteReports: WasteReportRecord[]) {
+export function buildOverviewPayload(
+  traces: TraceRecord[],
+  wasteReports: WasteReportRecord[],
+  turnsByTraceId?: Map<string, number>,
+) {
   const actionableWasteReports = getActionableWasteReports(wasteReports);
   const totalCostUsd = sumBy(traces, (trace) => trace.totalCostUsd);
   const tracesWithWaste = new Set(actionableWasteReports.map((report) => report.traceId)).size;
@@ -119,9 +123,11 @@ export function buildOverviewPayload(traces: TraceRecord[], wasteReports: WasteR
     .map(([model, items]) => ({
       model,
       costUsd: sumBy(items, (item) => item.totalCostUsd),
+      inputTokens: sumBy(items, (item) => item.totalInputTokens),
+      outputTokens: sumBy(items, (item) => item.totalOutputTokens),
       traceCount: items.length,
     }))
-    .sort((left, right) => right.costUsd - left.costUsd);
+    .sort((left, right) => (right.inputTokens + right.outputTokens) - (left.inputTokens + left.outputTokens));
 
   return {
     totalTraces: traces.length,
@@ -132,6 +138,69 @@ export function buildOverviewPayload(traces: TraceRecord[], wasteReports: WasteR
     topWasteCategories,
     costByDay,
     costByModel,
+    // Success rate
+    successRate: {
+      complete: traces.filter((t) => t.status === "complete").length,
+      error: traces.filter((t) => t.status === "error").length,
+      partial: traces.filter((t) => t.status === "partial").length,
+      completePercent:
+        traces.length > 0
+          ? (traces.filter((t) => t.status === "complete").length / traces.length) * 100
+          : 0,
+    },
+    // Turns (LLM spans per session)
+    turns: (() => {
+      if (!turnsByTraceId || turnsByTraceId.size === 0) return { avg: 0, min: 0, max: 0, total: 0 };
+      const values = [...turnsByTraceId.values()].filter((v) => v > 0);
+      if (values.length === 0) return { avg: 0, min: 0, max: 0, total: 0 };
+      const total = values.reduce((s, v) => s + v, 0);
+      return {
+        avg: Math.round(total / values.length),
+        min: Math.min(...values),
+        max: Math.max(...values),
+        total,
+      };
+    })(),
+    // Project breakdown
+    byProject: (() => {
+      const projectMap = new Map<string, TraceRecord[]>();
+      for (const trace of traces) {
+        const meta = trace.metadata as Record<string, unknown> | null;
+        const project = (meta?.project as string) ?? "unknown";
+        const list = projectMap.get(project) ?? [];
+        list.push(trace);
+        projectMap.set(project, list);
+      }
+
+      return [...projectMap.entries()]
+        .map(([project, projectTraces]) => {
+          const totalTokens = sumBy(projectTraces, (t) => t.totalInputTokens + t.totalOutputTokens);
+          const totalTurns = projectTraces.reduce(
+            (sum, t) => sum + (turnsByTraceId?.get(t.id) ?? 0),
+            0,
+          );
+          const complete = projectTraces.filter((t) => t.status === "complete").length;
+          return {
+            project,
+            sessions: projectTraces.length,
+            totalTokens,
+            totalInputTokens: sumBy(projectTraces, (t) => t.totalInputTokens),
+            totalOutputTokens: sumBy(projectTraces, (t) => t.totalOutputTokens),
+            totalCostUsd: sumBy(projectTraces, (t) => t.totalCostUsd),
+            avgTurns: projectTraces.length > 0 ? Math.round(totalTurns / projectTraces.length) : 0,
+            successRate: projectTraces.length > 0 ? (complete / projectTraces.length) * 100 : 0,
+          };
+        })
+        .sort((a, b) => b.totalTokens - a.totalTokens);
+    })(),
+    totalCacheReadTokens: traces.reduce((sum, t) => {
+      const meta = t.metadata as Record<string, unknown> | null;
+      return sum + (typeof meta?.totalCacheReadTokens === "number" ? meta.totalCacheReadTokens : 0);
+    }, 0),
+    totalCacheWriteTokens: traces.reduce((sum, t) => {
+      const meta = t.metadata as Record<string, unknown> | null;
+      return sum + (typeof meta?.totalCacheCreationTokens === "number" ? meta.totalCacheCreationTokens : 0);
+    }, 0),
     lastScanAt:
       traces.length > 0
         ? new Date(Math.max(...traces.map((trace) => trace.ingestedAt.getTime()))).toISOString()
@@ -139,17 +208,20 @@ export function buildOverviewPayload(traces: TraceRecord[], wasteReports: WasteR
   };
 }
 
+const CATEGORY_DESCRIPTIONS: Record<string, string> = {
+  tool_failure_waste: "Tool calls are failing and triggering extra model work to recover. Review failing tool paths and error handling.",
+  agent_loop: "Sub-agents are repeating the same tool calls in loops. Add loop guards or stopping conditions.",
+  retry_waste: "Duplicate or near-duplicate prompts are being sent. Improve initial prompt clarity.",
+  low_cache_utilization: "Some spans have low cache hit rates. Consider restructuring prompts to maximize cache reuse.",
+  high_output: "Some LLM responses are unusually verbose. Consider stricter output limits.",
+  cache_expiry: "Idle gaps are causing cache expiry. Keep the cache warm during long pauses.",
+};
+
 export function buildRecommendations(wasteReports: WasteReportRecord[]) {
   const actionableWasteReports = getActionableWasteReports(wasteReports);
 
-  return [
-    ...groupBy(
-      actionableWasteReports,
-      (report) => `${report.category}::${report.recommendation}`,
-    ).entries(),
-  ]
-    .map(([key, reports]) => {
-      const [category, recommendation] = key.split("::");
+  return [...groupBy(actionableWasteReports, (report) => report.category).entries()]
+    .map(([category, reports]) => {
       const severities = ["low", "medium", "high", "critical"] as const;
       const priority =
         reports
@@ -158,7 +230,7 @@ export function buildRecommendations(wasteReports: WasteReportRecord[]) {
 
       return {
         category,
-        description: recommendation,
+        description: CATEGORY_DESCRIPTIONS[category] ?? reports[0]?.recommendation ?? category,
         affectedTraces: new Set(reports.map((report) => report.traceId)).size,
         estimatedSavingsUsd: sumBy(
           reports,

@@ -5,39 +5,67 @@ export interface ModelPricing {
   inputPricePerMToken: number;
   outputPricePerMToken: number;
   cachedInputPricePerMToken?: number;
+  cacheWrite5mInputPricePerMToken?: number;
+  cacheWrite1hInputPricePerMToken?: number;
   updatedAt: string;
 }
 
 export const MODEL_PRICING: ModelPricing[] = [
   // ──────────────────────────────────────────
-  // Anthropic
+  // Anthropic — Opus 4.5 / 4.6 ($5 input)
+  // ──────────────────────────────────────────
+  {
+    provider: "anthropic",
+    model: "claude-opus-4-6",
+    aliases: ["claude-opus-4-5", "opus-4-5", "opus-4-6"],
+    inputPricePerMToken: 5,
+    outputPricePerMToken: 25,
+    cachedInputPricePerMToken: 0.5,
+    cacheWrite5mInputPricePerMToken: 6.25,
+    cacheWrite1hInputPricePerMToken: 10,
+    updatedAt: "2026-04-03",
+  },
+  // ──────────────────────────────────────────
+  // Anthropic — Opus 4.0 / 4.1 ($15 input)
   // ──────────────────────────────────────────
   {
     provider: "anthropic",
     model: "claude-opus-4-20250514",
-    aliases: ["claude-opus-4", "claude-opus-4-5", "opus-4", "opus-4-5", "claude-opus-4-6"],
+    aliases: ["claude-opus-4", "claude-opus-4-1", "opus-4", "opus-4-1"],
     inputPricePerMToken: 15,
     outputPricePerMToken: 75,
     cachedInputPricePerMToken: 1.5,
-    updatedAt: "2026-03-21",
+    cacheWrite5mInputPricePerMToken: 18.75,
+    cacheWrite1hInputPricePerMToken: 30,
+    updatedAt: "2026-04-03",
   },
+  // ──────────────────────────────────────────
+  // Anthropic — Sonnet 4.x ($3 input)
+  // ──────────────────────────────────────────
   {
     provider: "anthropic",
     model: "claude-sonnet-4-20250514",
-    aliases: ["claude-sonnet-4", "claude-sonnet-4-5", "sonnet-4", "sonnet-4-5", "claude-sonnet-4-6"],
+    aliases: ["claude-sonnet-4", "claude-sonnet-4-5", "claude-sonnet-4-6", "sonnet-4", "sonnet-4-5", "sonnet-4-6"],
     inputPricePerMToken: 3,
     outputPricePerMToken: 15,
     cachedInputPricePerMToken: 0.3,
-    updatedAt: "2026-03-21",
+    cacheWrite5mInputPricePerMToken: 3.75,
+    cacheWrite1hInputPricePerMToken: 6,
+    updatedAt: "2026-04-03",
   },
+  // ──────────────────────────────────────────
+  // Anthropic — Haiku
+  // ──────────────────────────────────────────
   {
     provider: "anthropic",
     model: "claude-haiku-4-5-20251001",
     aliases: ["claude-haiku-4.5", "claude-haiku-4-5", "haiku-4.5", "haiku-4-5"],
-    inputPricePerMToken: 0.8,
-    outputPricePerMToken: 4,
-    cachedInputPricePerMToken: 0.08,
-    updatedAt: "2026-03-21",
+    inputPricePerMToken: 1,
+    outputPricePerMToken: 5,
+    cachedInputPricePerMToken: 0.1,
+    cacheWrite5mInputPricePerMToken: 1.25,
+    cacheWrite1hInputPricePerMToken: 2,
+    updatedAt: "2026-04-03",
   },
   {
     provider: "anthropic",
@@ -46,7 +74,9 @@ export const MODEL_PRICING: ModelPricing[] = [
     inputPricePerMToken: 0.8,
     outputPricePerMToken: 4,
     cachedInputPricePerMToken: 0.08,
-    updatedAt: "2026-03-21",
+    cacheWrite5mInputPricePerMToken: 1,
+    cacheWrite1hInputPricePerMToken: 1.6,
+    updatedAt: "2026-04-03",
   },
 
   // ──────────────────────────────────────────

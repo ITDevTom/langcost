@@ -16,6 +16,7 @@ const wasteCategoryValues = [
   "tool_failure_waste",
   "high_output",
   "oversized_context",
+  "cache_expiry",
 ] as const;
 
 const severityValues = ["low", "medium", "high", "critical"] as const;
@@ -53,7 +54,8 @@ export const wasteReports = sqliteTable(
         'retry_waste',
         'tool_failure_waste',
         'high_output',
-        'oversized_context'
+        'oversized_context',
+        'cache_expiry'
       )`,
     ),
     check(

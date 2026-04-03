@@ -66,8 +66,34 @@ export interface OverviewResponse {
   costByModel: Array<{
     model: string;
     costUsd: number;
+    inputTokens: number;
+    outputTokens: number;
     traceCount: number;
   }>;
+  successRate: {
+    complete: number;
+    error: number;
+    partial: number;
+    completePercent: number;
+  };
+  turns: {
+    avg: number;
+    min: number;
+    max: number;
+    total: number;
+  };
+  byProject: Array<{
+    project: string;
+    sessions: number;
+    totalTokens: number;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    totalCostUsd: number;
+    avgTurns: number;
+    successRate: number;
+  }>;
+  totalCacheReadTokens: number;
+  totalCacheWriteTokens: number;
   lastScanAt: string | null;
 }
 
@@ -216,6 +242,16 @@ export interface SegmentBreakdownResponse {
   totalCostUsd: number;
 }
 
+export interface SourceInfo {
+  name: string;
+  traceCount: number;
+  lastScanAt: string;
+}
+
+export interface SourcesResponse {
+  sources: SourceInfo[];
+}
+
 class ApiError extends Error {}
 
 function buildQuery(params: Record<string, string | number | undefined>): string {
@@ -271,8 +307,12 @@ export async function triggerScan(force = false): Promise<ScanResponse> {
   });
 }
 
-export async function getOverview(): Promise<OverviewResponse> {
-  return request<OverviewResponse>("/overview");
+export async function getSources(): Promise<SourcesResponse> {
+  return request<SourcesResponse>("/sources");
+}
+
+export async function getOverview(source?: string): Promise<OverviewResponse> {
+  return request<OverviewResponse>(`/overview${buildQuery({ source })}`);
 }
 
 export async function getRecommendations(): Promise<{ recommendations: Recommendation[] }> {
@@ -287,6 +327,7 @@ export async function getTraces(
     since?: string;
     model?: string;
     status?: string;
+    source?: string;
   } = {},
 ): Promise<TraceListResponse> {
   return request<TraceListResponse>(
@@ -297,6 +338,7 @@ export async function getTraces(
       since: params.since,
       model: params.model,
       status: params.status,
+      source: params.source,
     })}`,
   );
 }
@@ -306,7 +348,7 @@ export async function getTraceDetail(traceId: string): Promise<TraceDetailRespon
 }
 
 export async function getWaste(
-  params: { category?: string; severity?: string; limit?: number; offset?: number } = {},
+  params: { category?: string; severity?: string; limit?: number; offset?: number; source?: string } = {},
 ): Promise<WasteListResponse> {
   return request<WasteListResponse>(
     `/waste${buildQuery({
@@ -314,6 +356,7 @@ export async function getWaste(
       severity: params.severity,
       limit: params.limit,
       offset: params.offset,
+      source: params.source,
     })}`,
   );
 }

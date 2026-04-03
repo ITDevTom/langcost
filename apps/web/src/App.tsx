@@ -3,8 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getHealth,
   getSettings,
+  getSources,
   type HealthResponse,
   type SettingsResponse,
+  type SourceInfo,
   triggerScan,
 } from "./api/client";
 import { Header } from "./components/layout/Header";
@@ -58,6 +60,14 @@ export default function App() {
 
     return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   });
+  const [sources, setSources] = useState<SourceInfo[]>([]);
+  const [activeSource, setActiveSource] = useState<string | undefined>(() => {
+    return window.localStorage.getItem("langcost-source") ?? undefined;
+  });
+  const [billingMode, setBillingMode] = useState<"subscription" | "api">(() => {
+    const saved = window.localStorage.getItem("langcost-billing");
+    return saved === "api" ? "api" : "subscription";
+  });
   const [loadingShell, setLoadingShell] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
@@ -79,10 +89,39 @@ export default function App() {
     window.localStorage.setItem("langcost-theme", theme);
   }, [theme]);
 
+  function handleSourceChange(source: string | undefined) {
+    setActiveSource(source);
+    if (source) {
+      window.localStorage.setItem("langcost-source", source);
+    } else {
+      window.localStorage.removeItem("langcost-source");
+    }
+    setRefreshToken((current) => current + 1);
+  }
+
+  function handleBillingModeChange(mode: "subscription" | "api") {
+    setBillingMode(mode);
+    window.localStorage.setItem("langcost-billing", mode);
+  }
+
   async function reloadShell() {
-    const [nextSettings, nextHealth] = await Promise.all([getSettings(), getHealth()]);
+    const [nextSettings, nextHealth, nextSources] = await Promise.all([
+      getSettings(),
+      getHealth(),
+      getSources(),
+    ]);
     setSettings(nextSettings);
     setHealth(nextHealth);
+    setSources(nextSources.sources);
+
+    // Auto-select source if only one exists or saved source is no longer valid
+    const sourceNames = nextSources.sources.map((s) => s.name);
+    if (activeSource && !sourceNames.includes(activeSource)) {
+      handleSourceChange(sourceNames[0]);
+    } else if (!activeSource && sourceNames.length === 1) {
+      handleSourceChange(sourceNames[0]);
+    }
+
     setRefreshToken((current) => current + 1);
   }
 
@@ -91,7 +130,11 @@ export default function App() {
 
     void (async () => {
       try {
-        const [nextSettings, nextHealth] = await Promise.all([getSettings(), getHealth()]);
+        const [nextSettings, nextHealth, nextSources] = await Promise.all([
+          getSettings(),
+          getHealth(),
+          getSources(),
+        ]);
 
         if (!active) {
           return;
@@ -99,6 +142,18 @@ export default function App() {
 
         setSettings(nextSettings);
         setHealth(nextHealth);
+        setSources(nextSources.sources);
+
+        // Auto-select source
+        const sourceNames = nextSources.sources.map((s) => s.name);
+        const saved = window.localStorage.getItem("langcost-source") ?? undefined;
+        if (saved && sourceNames.includes(saved)) {
+          setActiveSource(saved);
+        } else if (sourceNames.length >= 1) {
+          const pick = sourceNames[0];
+          setActiveSource(pick);
+          window.localStorage.setItem("langcost-source", pick);
+        }
       } catch (cause) {
         if (!active) {
           return;
@@ -180,6 +235,11 @@ export default function App() {
         refreshing={refreshing}
         theme={theme}
         onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+        sources={sources}
+        activeSource={activeSource}
+        onSourceChange={handleSourceChange}
+        billingMode={billingMode}
+        onBillingModeChange={handleBillingModeChange}
       />
 
       <main className="page-shell">
@@ -193,10 +253,10 @@ export default function App() {
           <Setup initialSettings={settings} onConfigured={handleConfigured} />
         ) : null}
         {route.page === "traces" ? (
-          <Sessions refreshToken={refreshToken} onNavigate={navigate} />
+          <Sessions refreshToken={refreshToken} onNavigate={navigate} source={activeSource} billingMode={billingMode} />
         ) : null}
         {route.page === "overview" ? (
-          <Overview refreshToken={refreshToken} onNavigate={navigate} />
+          <Overview refreshToken={refreshToken} onNavigate={navigate} source={activeSource} billingMode={billingMode} />
         ) : null}
         {route.page === "settings" ? (
           <Settings

@@ -1,4 +1,4 @@
-import { createWasteReportRepository } from "@langcost/db";
+import { createTraceRepository, createWasteReportRepository } from "@langcost/db";
 import { Hono } from "hono";
 
 import { buildRecommendations, groupBy, sumBy } from "../lib/aggregations";
@@ -10,11 +10,22 @@ export function createWasteRoute(options: { dbPath?: string } = {}) {
   route.get("/", async (c) => {
     const category = c.req.query("category");
     const severity = c.req.query("severity");
+    const source = c.req.query("source");
     const limit = Number(c.req.query("limit") ?? "20");
     const offset = Number(c.req.query("offset") ?? "0");
 
     const payload = await withDb(options.dbPath, (db) => {
       let reports = createWasteReportRepository(db).list();
+
+      if (source) {
+        const traceIds = new Set(
+          createTraceRepository(db)
+            .listForAnalysis()
+            .filter((t) => t.source === source)
+            .map((t) => t.id),
+        );
+        reports = reports.filter((r) => traceIds.has(r.traceId));
+      }
 
       if (category) {
         reports = reports.filter((report) => report.category === category);

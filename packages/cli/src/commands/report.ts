@@ -127,7 +127,27 @@ export async function runReportCommand(
       traces = traces.filter((trace) => wasteByTrace.has(trace.id));
     }
 
-    traces.sort((left, right) => {
+    // Group subagent traces under their parent for claude-code sessions
+    const parentTraces: typeof traces = [];
+    const subagentsByParent = new Map<string, typeof traces>();
+
+    for (const trace of traces) {
+      const metadata = trace.metadata as Record<string, unknown> | null;
+      const parentId = metadata?.parentConversationId as string | null;
+
+      if (parentId && trace.source === "claude-code") {
+        const parentTraceId = `claude-code:trace:${parentId}`;
+        if (!subagentsByParent.has(parentTraceId)) {
+          subagentsByParent.set(parentTraceId, []);
+        }
+        subagentsByParent.get(parentTraceId)!.push(trace);
+      } else {
+        parentTraces.push(trace);
+      }
+    }
+
+    // Roll up subagent totals into parent trace rows
+    parentTraces.sort((left, right) => {
       switch (options.sort) {
         case "cost":
           return right.totalCostUsd - left.totalCostUsd;
@@ -138,22 +158,52 @@ export async function runReportCommand(
       }
     });
 
-    const rows = traces.slice(0, options.limit).map((trace) => ({
-      trace: trace.id,
-      started: formatDateTime(trace.startedAt),
-      model: trace.model ?? "-",
-      status: trace.status,
-      cost: formatCurrency(trace.totalCostUsd),
-      waste: formatCurrency(wasteByTrace.get(trace.id) ?? 0),
-    }));
+    function formatTokens(count: number): string {
+      if (count >= 1_000_000) return `${(count / 1_000_000).toFixed(1)}M`;
+      if (count >= 1_000) return `${(count / 1_000).toFixed(1)}k`;
+      return String(count);
+    }
+
+    function getProject(trace: (typeof traces)[0]): string {
+      const metadata = trace.metadata as Record<string, unknown> | null;
+      return (metadata?.project as string) ?? "-";
+    }
+
+    const rows = parentTraces.slice(0, options.limit).map((trace) => {
+      const subagents = subagentsByParent.get(trace.id) ?? [];
+      const totalCost =
+        trace.totalCostUsd + subagents.reduce((sum, sa) => sum + sa.totalCostUsd, 0);
+      const totalWaste =
+        (wasteByTrace.get(trace.id) ?? 0) +
+        subagents.reduce((sum, sa) => sum + (wasteByTrace.get(sa.id) ?? 0), 0);
+      const totalInput =
+        trace.totalInputTokens + subagents.reduce((sum, sa) => sum + sa.totalInputTokens, 0);
+      const totalOutput =
+        trace.totalOutputTokens + subagents.reduce((sum, sa) => sum + sa.totalOutputTokens, 0);
+
+      return {
+        project: getProject(trace),
+        started: formatDateTime(trace.startedAt),
+        model: trace.model ?? "-",
+        status: trace.status,
+        input: formatTokens(totalInput),
+        output: formatTokens(totalOutput),
+        cost: formatCurrency(totalCost),
+        waste: formatCurrency(totalWaste),
+        agents: subagents.length > 0 ? `+${subagents.length}` : "",
+      };
+    });
 
     const columns: TableColumn[] = [
-      { key: "trace", label: "Trace" },
+      { key: "project", label: "Project" },
       { key: "started", label: "Started" },
       { key: "model", label: "Model" },
       { key: "status", label: "Status" },
+      { key: "input", label: "Input", align: "right" },
+      { key: "output", label: "Output", align: "right" },
       { key: "cost", label: "Cost", align: "right" },
       { key: "waste", label: "Waste", align: "right" },
+      { key: "agents", label: "Sub" },
     ];
 
     runtime.io.write(`${formatReportRows(rows, columns, options.format)}\n`);

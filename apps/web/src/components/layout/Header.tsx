@@ -1,3 +1,5 @@
+import type { SourceInfo } from "../../api/client";
+
 interface HeaderProps {
   configured: boolean;
   currentPath: string;
@@ -6,7 +8,18 @@ interface HeaderProps {
   refreshing: boolean;
   theme: "dark" | "light";
   onToggleTheme: () => void;
+  sources: SourceInfo[];
+  activeSource?: string;
+  onSourceChange: (source: string | undefined) => void;
+  billingMode: "subscription" | "api";
+  onBillingModeChange: (mode: "subscription" | "api") => void;
 }
+
+const SOURCE_LABELS: Record<string, string> = {
+  "claude-code": "Claude Code",
+  openclaw: "OpenClaw",
+  langfuse: "Langfuse",
+};
 
 const NAV_ITEMS = [
   { path: "/", label: "Traces" },
@@ -22,6 +35,11 @@ export function Header({
   refreshing,
   theme,
   onToggleTheme,
+  sources,
+  activeSource,
+  onSourceChange,
+  billingMode,
+  onBillingModeChange,
 }: HeaderProps) {
   return (
     <header className="site-header fixed inset-x-0 top-0 z-20 border-b border-[color:var(--border)] backdrop-blur">
@@ -65,6 +83,44 @@ export function Header({
         </div>
 
         <div className="flex items-center gap-2">
+          {configured && sources.length > 1 ? (
+            <select
+              value={activeSource ?? ""}
+              onChange={(e) => onSourceChange(e.target.value || undefined)}
+              className="source-selector rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1.5 text-sm font-medium"
+              style={{ color: "var(--text-primary)" }}
+            >
+              {sources.map((s) => (
+                <option key={s.name} value={s.name}>
+                  {SOURCE_LABELS[s.name] ?? s.name} ({s.traceCount})
+                </option>
+              ))}
+            </select>
+          ) : configured && sources.length === 1 ? (
+            <span className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1.5 text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+              {SOURCE_LABELS[sources[0].name] ?? sources[0].name}
+            </span>
+          ) : null}
+
+          {configured ? (
+            <div className="theme-toggle">
+              <button
+                type="button"
+                onClick={() => onBillingModeChange("subscription")}
+                className={`theme-toggle__label ${billingMode === "subscription" ? "theme-toggle__label--active" : ""}`}
+              >
+                Sub
+              </button>
+              <button
+                type="button"
+                onClick={() => onBillingModeChange("api")}
+                className={`theme-toggle__label ${billingMode === "api" ? "theme-toggle__label--active" : ""}`}
+              >
+                API
+              </button>
+            </div>
+          ) : null}
+
           <button
             type="button"
             onClick={onToggleTheme}

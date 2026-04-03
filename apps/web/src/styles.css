@@ -397,7 +397,7 @@ h4,
   .soft-card {
     @apply rounded-2xl border p-4;
     border-color: color-mix(in srgb, var(--border) 94%, transparent);
-    background-color: color-mix(in srgb, var(--surface-alt) 74%, transparent);
+    background-color: color-mix(in srgb, var(--surface) 92%, white);
   }
 
   .detail-shell {
@@ -435,13 +435,13 @@ h4,
   .timeline-log {
     font-family:
       "JetBrains Mono", "IBM Plex Mono", "SFMono-Regular", "SF Mono", ui-monospace, monospace;
-    font-size: 13px;
-    line-height: 28px;
+    font-size: 14px;
+    line-height: 32px;
   }
 
   .timeline-line {
     @apply flex items-center gap-3;
-    min-height: 28px;
+    min-height: 32px;
     white-space: nowrap;
   }
 
