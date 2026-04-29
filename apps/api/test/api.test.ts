@@ -31,8 +31,9 @@ function createFixtureSourcePath(files: string[]): string {
   const sessionsPath = join(root, "agents", "demo", "sessions");
   mkdirSync(sessionsPath, { recursive: true });
 
+  const fixturesRoot = join(import.meta.dir, "..", "..", "..", "fixtures");
   for (const file of files) {
-    copyFileSync(join(process.cwd(), "fixtures", "openclaw", file), join(sessionsPath, file));
+    copyFileSync(join(fixturesRoot, "openclaw", file), join(sessionsPath, file));
   }
 
   return root;

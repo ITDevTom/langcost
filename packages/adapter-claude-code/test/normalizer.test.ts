@@ -1,8 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { join } from "node:path";
-
-import { readConversationFile } from "../src/reader";
 import { normalizeConversation } from "../src/normalizer";
+import { readConversationFile } from "../src/reader";
 import type { DiscoveredConversationFile } from "../src/types";
 
 function makeConversationFile(

@@ -1,6 +1,11 @@
 import { useMemo, useState } from "react";
 
-import type { MessageRecord, SpanRecord, TraceDetailResponse, WasteReportRecord } from "../../api/client";
+import type {
+  MessageRecord,
+  SpanRecord,
+  TraceDetailResponse,
+  WasteReportRecord,
+} from "../../api/client";
 import { formatCompactInt, formatUsd } from "../../lib/format";
 
 interface SessionDetailProps {
@@ -19,7 +24,11 @@ function truncateText(value: string, maxLength = 72): string {
   return value.length <= maxLength ? value : `${value.slice(0, maxLength - 1)}…`;
 }
 
-function getAssistantPreview(messages: MessageRecord[], spanId: string, maxLength = 120): string | null {
+function getAssistantPreview(
+  messages: MessageRecord[],
+  spanId: string,
+  maxLength = 120,
+): string | null {
   const assistantMsg = messages.find((m) => m.spanId === spanId && m.role === "assistant");
   if (!assistantMsg?.content) return null;
   // Strip markdown headers, tool blocks, and collapse whitespace
@@ -60,7 +69,16 @@ function getToolSummary(span: SpanRecord): string {
     }
 
     // For Read/Glob/Grep: show path or pattern
-    for (const key of ["file_path", "filePath", "path", "pattern", "query", "url", "prompt", "description"]) {
+    for (const key of [
+      "file_path",
+      "filePath",
+      "path",
+      "pattern",
+      "query",
+      "url",
+      "prompt",
+      "description",
+    ]) {
       const val = parsed[key];
       if (typeof val === "string" && val.length > 0) return truncateText(val, 80);
     }
@@ -74,7 +92,6 @@ function getToolSummary(span: SpanRecord): string {
 
   return truncateText(rawInput, 60);
 }
-
 
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
@@ -201,11 +218,16 @@ function timelineStatusLabel(status: "ok" | "error"): string {
 
 function categoryToFilter(category: string): FilterMode | null {
   switch (category) {
-    case "high_output": return "verbose";
-    case "tool_failure_waste": return "tool_failures";
-    case "retry_waste": return "retries";
-    case "agent_loop": return "agent_loops";
-    default: return null;
+    case "high_output":
+      return "verbose";
+    case "tool_failure_waste":
+      return "tool_failures";
+    case "retry_waste":
+      return "retries";
+    case "agent_loop":
+      return "agent_loops";
+    default:
+      return null;
   }
 }
 
@@ -219,7 +241,10 @@ export function SessionDetail({ detail, loading, onViewTrace }: SessionDetailPro
     () => detail?.wasteReports.filter((report) => !isInformational(report)) ?? [],
     [detail],
   );
-  const informationalReports = useMemo(() => detail?.wasteReports.filter(isInformational) ?? [], [detail]);
+  const informationalReports = useMemo(
+    () => detail?.wasteReports.filter(isInformational) ?? [],
+    [detail],
+  );
   const wasteSegments = useMemo(() => {
     const groupedActionable = new Map<string, WasteReportRecord[]>();
     for (const report of actionableReports) {
@@ -315,10 +340,13 @@ export function SessionDetail({ detail, loading, onViewTrace }: SessionDetailPro
     if (filterMode === "all") return timeline;
 
     const relevantSpanIds =
-      filterMode === "verbose" ? wasteSpanIds.verbose
-      : filterMode === "tool_failures" ? wasteSpanIds.toolFailures
-      : filterMode === "retries" ? wasteSpanIds.retries
-      : wasteSpanIds.agentLoops;
+      filterMode === "verbose"
+        ? wasteSpanIds.verbose
+        : filterMode === "tool_failures"
+          ? wasteSpanIds.toolFailures
+          : filterMode === "retries"
+            ? wasteSpanIds.retries
+            : wasteSpanIds.agentLoops;
 
     return timeline.filter(({ span, tools }) => {
       if (relevantSpanIds.has(span.id)) return true;
@@ -362,7 +390,7 @@ export function SessionDetail({ detail, loading, onViewTrace }: SessionDetailPro
                       onClick={(e) => {
                         e.stopPropagation();
                         if (!isClickable) return;
-                        setFilterMode(isActive ? "all" : segment.filter!);
+                        setFilterMode(isActive ? "all" : (segment.filter ?? "all"));
                         setVisibleCalls(INITIAL_VISIBLE_LLM_CALLS);
                       }}
                       className={`timeline-summary__item ${
@@ -401,7 +429,10 @@ export function SessionDetail({ detail, loading, onViewTrace }: SessionDetailPro
               No matching spans found for this filter.{" "}
               <button
                 type="button"
-                onClick={(e) => { e.stopPropagation(); setFilterMode("all"); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFilterMode("all");
+                }}
                 className="text-slate-300 underline"
                 style={{ background: "none", border: "none" }}
               >
@@ -412,9 +443,8 @@ export function SessionDetail({ detail, loading, onViewTrace }: SessionDetailPro
 
           {visibleTimeline.map(({ index, span, tools }) => {
             // When filtering by tool_failures, only show the failed tools
-            const visibleTools = filterMode === "tool_failures"
-              ? tools.filter((t) => t.status === "error")
-              : tools;
+            const visibleTools =
+              filterMode === "tool_failures" ? tools.filter((t) => t.status === "error") : tools;
 
             return (
               <div key={span.id}>
@@ -440,16 +470,24 @@ export function SessionDetail({ detail, loading, onViewTrace }: SessionDetailPro
                   </span>
                 </div>
 
-                {filterMode !== "all" && detail?.messages ? (() => {
-                  const preview = getAssistantPreview(detail.messages, span.id);
-                  return preview ? (
-                    <div className="timeline-line timeline-line--tool px-4" style={{ paddingLeft: "4.5rem" }}>
-                      <span className="text-slate-400 text-xs leading-5" style={{ whiteSpace: "normal", wordBreak: "break-word" }}>
-                        {preview}
-                      </span>
-                    </div>
-                  ) : null;
-                })() : null}
+                {filterMode !== "all" && detail?.messages
+                  ? (() => {
+                      const preview = getAssistantPreview(detail.messages, span.id);
+                      return preview ? (
+                        <div
+                          className="timeline-line timeline-line--tool px-4"
+                          style={{ paddingLeft: "4.5rem" }}
+                        >
+                          <span
+                            className="text-slate-400 text-xs leading-5"
+                            style={{ whiteSpace: "normal", wordBreak: "break-word" }}
+                          >
+                            {preview}
+                          </span>
+                        </div>
+                      ) : null;
+                    })()
+                  : null}
 
                 {visibleTools.map((toolSpan, toolIndex) => (
                   <div key={toolSpan.id} className="timeline-line timeline-line--tool px-4">

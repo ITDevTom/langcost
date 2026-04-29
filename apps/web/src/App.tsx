@@ -149,7 +149,7 @@ export default function App() {
         const saved = window.localStorage.getItem("langcost-source") ?? undefined;
         if (saved && sourceNames.includes(saved)) {
           setActiveSource(saved);
-        } else if (sourceNames.length >= 1) {
+        } else if (sourceNames.length >= 1 && sourceNames[0]) {
           const pick = sourceNames[0];
           setActiveSource(pick);
           window.localStorage.setItem("langcost-source", pick);
@@ -253,10 +253,20 @@ export default function App() {
           <Setup initialSettings={settings} onConfigured={handleConfigured} />
         ) : null}
         {route.page === "traces" ? (
-          <Sessions refreshToken={refreshToken} onNavigate={navigate} source={activeSource} billingMode={billingMode} />
+          <Sessions
+            refreshToken={refreshToken}
+            onNavigate={navigate}
+            source={activeSource}
+            billingMode={billingMode}
+          />
         ) : null}
         {route.page === "overview" ? (
-          <Overview refreshToken={refreshToken} onNavigate={navigate} source={activeSource} billingMode={billingMode} />
+          <Overview
+            refreshToken={refreshToken}
+            onNavigate={navigate}
+            source={activeSource}
+            billingMode={billingMode}
+          />
         ) : null}
         {route.page === "settings" ? (
           <Settings

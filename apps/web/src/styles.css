@@ -300,7 +300,7 @@ h4,
   }
 
   .stat-strip {
-    @apply flex flex-wrap items-center gap-2 rounded-xl border px-4 py-2.5 text-[13px];
+    @apply flex flex-wrap items-center justify-center gap-3 rounded-xl border px-5 py-3 text-base;
     border-color: var(--border);
     background-color: color-mix(in srgb, var(--surface-alt) 76%, transparent);
     color: var(--text-secondary);

@@ -1,0 +1,21 @@
+# Source files (dist is published)
+src/
+
+# Build configs
+vite.config.ts
+tailwind.config.ts
+tsconfig.json
+
+# Dev documentation
+CLAUDE.md
+
+# OS files
+.DS_Store
+
+# Local dependencies
+node_modules/
+
+# Test files
+*.test.ts
+*.test.tsx
+__tests__/

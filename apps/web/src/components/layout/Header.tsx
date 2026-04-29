@@ -9,7 +9,7 @@ interface HeaderProps {
   theme: "dark" | "light";
   onToggleTheme: () => void;
   sources: SourceInfo[];
-  activeSource?: string;
+  activeSource?: string | undefined;
   onSourceChange: (source: string | undefined) => void;
   billingMode: "subscription" | "api";
   onBillingModeChange: (mode: "subscription" | "api") => void;
@@ -54,7 +54,10 @@ export function Header({
                 (e.target as HTMLImageElement).style.display = "none";
               }}
             />
-            <span className="text-[15px] font-bold tracking-[-0.01em]" style={{ color: "var(--text-primary)" }}>
+            <span
+              className="text-[15px] font-bold tracking-[-0.01em]"
+              style={{ color: "var(--text-primary)" }}
+            >
               Lang<span style={{ color: "var(--accent-orange, #ff6b00)" }}>Cost</span>
             </span>
           </button>
@@ -96,8 +99,11 @@ export function Header({
                 </option>
               ))}
             </select>
-          ) : configured && sources.length === 1 ? (
-            <span className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1.5 text-sm font-medium" style={{ color: "var(--text-secondary)" }}>
+          ) : configured && sources.length === 1 && sources[0] ? (
+            <span
+              className="rounded-lg border border-[color:var(--border)] bg-[color:var(--surface-2)] px-3 py-1.5 text-sm font-medium"
+              style={{ color: "var(--text-secondary)" }}
+            >
               {SOURCE_LABELS[sources[0].name] ?? sources[0].name}
             </span>
           ) : null}

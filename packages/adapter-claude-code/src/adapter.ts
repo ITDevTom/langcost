@@ -14,7 +14,7 @@ import { normalizeConversation } from "./normalizer";
 import { readConversationFile } from "./reader";
 
 export interface ClaudeCodeIngestOptions extends IngestOptions {
-  project?: string;
+  project?: string | undefined;
 }
 
 async function filterAlreadyIngested(db: Db, options: ClaudeCodeIngestOptions | undefined) {

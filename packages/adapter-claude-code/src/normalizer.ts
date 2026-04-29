@@ -133,7 +133,9 @@ function extractToolUseBlocks(content?: ClaudeCodeContentBlock[]): ClaudeCodeToo
   return content.filter(isToolUseBlock);
 }
 
-function extractToolResultBlocks(content?: string | ClaudeCodeContentBlock[]): ClaudeCodeToolResultBlock[] {
+function extractToolResultBlocks(
+  content?: string | ClaudeCodeContentBlock[],
+): ClaudeCodeToolResultBlock[] {
   if (!Array.isArray(content)) {
     return [];
   }
@@ -228,14 +230,15 @@ function deduplicateEntries(entries: ClaudeCodeEntry[]): ClaudeCodeEntry[] {
     if (!assistantGroups.has(groupKey)) {
       assistantGroups.set(groupKey, []);
     }
-    assistantGroups.get(groupKey)!.push(entry);
+    assistantGroups.get(groupKey)?.push(entry);
   }
 
   // Build a set of entries to keep (best from each group)
   const keepSet = new Set<ClaudeCodeEntry>();
   for (const group of assistantGroups.values()) {
-    const best =
-      group.findLast((g) => g.message.stop_reason !== null) ?? group[group.length - 1];
+    const last = group[group.length - 1];
+    if (!last) continue;
+    const best = group.findLast((g) => g.message.stop_reason !== null) ?? last;
     keepSet.add(best);
   }
 
@@ -354,7 +357,8 @@ export function normalizeConversation(
 
         for (const toolResult of toolResults) {
           const toolCallId = toolResult.tool_use_id ?? `orphan:${++orphanToolIndex}`;
-          const toolSpanId = toolSpanIdsByCallId.get(toolCallId) ?? toToolSpanId(traceId, toolCallId);
+          const toolSpanId =
+            toolSpanIdsByCallId.get(toolCallId) ?? toToolSpanId(traceId, toolCallId);
           const existingSpanIndex = spanIndexesById.get(toolSpanId);
           const resultContent = toolResultContent(toolResult);
 
@@ -451,7 +455,10 @@ export function normalizeConversation(
       const costData = model
         ? calculateCostFromUsage(usage, model)
         : {
-            inputTokens: (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0),
+            inputTokens:
+              (usage.input_tokens ?? 0) +
+              (usage.cache_creation_input_tokens ?? 0) +
+              (usage.cache_read_input_tokens ?? 0),
             outputTokens: usage.output_tokens ?? 0,
             cacheCreationTokens: usage.cache_creation_input_tokens ?? 0,
             cacheReadTokens: usage.cache_read_input_tokens ?? 0,

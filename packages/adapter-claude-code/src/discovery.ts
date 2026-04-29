@@ -64,10 +64,8 @@ async function discoverFromSingleFile(
   }
 
   const parts = expandedPath.split("/");
-  const projectDirIndex = parts.findIndex((_, i) =>
-    i > 0 && parts[i - 1] === "projects",
-  );
-  const projectDirName = projectDirIndex >= 0 ? parts[projectDirIndex] : "unknown";
+  const projectDirIndex = parts.findIndex((_, i) => i > 0 && parts[i - 1] === "projects");
+  const projectDirName = (projectDirIndex >= 0 ? parts[projectDirIndex] : undefined) ?? "unknown";
   const parsed = parseProjectDirectory(projectDirName);
 
   return [
@@ -213,7 +211,9 @@ async function discoverAllProjects(
 }
 
 export async function discoverConversationFiles(
-  options: Pick<IngestOptions, "file" | "since" | "sourcePath"> & { project?: string } = {},
+  options: Pick<IngestOptions, "file" | "since" | "sourcePath"> & {
+    project?: string | undefined;
+  } = {},
 ): Promise<DiscoveredConversationFile[]> {
   if (options.file) {
     return discoverFromSingleFile(options.file, options.since);

@@ -110,7 +110,13 @@ describe("calculateCostWithCache", () => {
 
   it("works with models that have no cache pricing", () => {
     // Mistral large has no cache pricing
-    const result = calculateCostWithCache("mistral-large-latest", 1_000_000, 1_000_000, 500_000, 500_000);
+    const result = calculateCostWithCache(
+      "mistral-large-latest",
+      1_000_000,
+      1_000_000,
+      500_000,
+      500_000,
+    );
 
     expect(result.inputCost).toBeCloseTo(2, 2);
     expect(result.outputCost).toBeCloseTo(6, 2);

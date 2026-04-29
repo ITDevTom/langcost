@@ -1,15 +1,17 @@
 import type { TraceSummary } from "../../api/client";
-import { formatCompactInt, formatUsd, statusDotClass, traceLabel } from "../../lib/format";
+import { formatCompactInt, formatUsd, traceLabel } from "../../lib/format";
 
-interface ModelTokens { model: string; tokens: number }
+interface ModelTokens {
+  model: string;
+  tokens: number;
+}
 
 interface SessionRowProps {
   trace: TraceSummary;
   expanded: boolean;
   onToggle: () => void;
   showProject?: boolean;
-  project?: string;
-  subagentCount?: number;
+  project?: string | undefined;
   showCost?: boolean;
   showCache?: boolean;
   cacheCost?: number;
@@ -25,11 +27,11 @@ function shortModelName(model: string): string {
     .replace("-4-6", "4.6");
 }
 
-const MODEL_COLORS: Record<string, string> = {
+const MODEL_COLORS = {
   opus: "#ff6b00",
   sonnet: "#3b82f6",
   haiku: "#10b981",
-};
+} as const;
 
 function getModelColor(model: string): string {
   const lower = model.toLowerCase();
@@ -39,30 +41,29 @@ function getModelColor(model: string): string {
   return "#6b7280";
 }
 
-function statusLabel(status: TraceSummary["status"]): string {
-  switch (status) {
-    case "error":
-      return "err";
-    case "partial":
-      return "partial";
-    default:
-      return "ok";
-  }
-}
-
-export function SessionRow({ trace, expanded, onToggle, showProject, project, subagentCount, showCost, showCache, cacheCost, showWaste, modelBreakdown }: SessionRowProps) {
+export function SessionRow({
+  trace,
+  expanded,
+  onToggle,
+  showProject,
+  project,
+  showCost,
+  showCache,
+  cacheCost,
+  showWaste,
+  modelBreakdown,
+}: SessionRowProps) {
   return (
     <tr
       onClick={onToggle}
       className="panel-hover cursor-pointer border-b border-[color:var(--border)] text-left transition-colors last:border-b-0"
     >
       <td className="px-4 py-2.5 align-middle">
-        <div className="flex items-center gap-2 text-sm text-slate-300">
-          <span
-            className={`inline-flex h-2.5 w-2.5 rounded-full ${statusDotClass(trace.status)}`}
-          />
-          <span className="font-medium lowercase">{statusLabel(trace.status)}</span>
-        </div>
+        <span
+          className="inline-flex h-2.5 w-2.5 rounded-full"
+          style={{ backgroundColor: trace.wasteUsd > 0 ? "#f97316" : "#22c55e" }}
+          title={trace.wasteUsd > 0 ? "Has savings potential" : "Optimized"}
+        />
       </td>
       {showProject ? (
         <td className="px-4 py-2.5 align-middle">
@@ -78,41 +79,56 @@ export function SessionRow({ trace, expanded, onToggle, showProject, project, su
         </div>
       </td>
       <td className="px-4 py-2.5 text-sm align-middle">
-        {modelBreakdown && modelBreakdown.length > 0 ? (() => {
-          const total = modelBreakdown.reduce((sum, m) => sum + m.tokens, 0);
-          if (total === 0) return <span className="text-slate-500">—</span>;
-          const tooltip = modelBreakdown
-            .map((m) => `${shortModelName(m.model)}: ${formatCompactInt(m.tokens)}`)
-            .join("\n");
-          return (
-            <div title={tooltip}>
-              <div className="flex h-2.5 w-full overflow-hidden rounded-full" style={{ background: "var(--surface-alt)", minWidth: "80px" }}>
-                {modelBreakdown.map((m) => {
-                  const pct = (m.tokens / total) * 100;
-                  if (pct < 1) return null;
-                  return (
-                    <div
-                      key={m.model}
-                      style={{
-                        width: `${pct}%`,
-                        backgroundColor: getModelColor(m.model),
-                      }}
-                    />
-                  );
-                })}
+        {modelBreakdown && modelBreakdown.length > 0 ? (
+          (() => {
+            const total = modelBreakdown.reduce((sum, m) => sum + m.tokens, 0);
+            if (total === 0) return <span className="text-slate-500">—</span>;
+            const tooltip = modelBreakdown
+              .map((m) => `${shortModelName(m.model)}: ${formatCompactInt(m.tokens)}`)
+              .join("\n");
+            return (
+              <div title={tooltip}>
+                <div
+                  className="flex h-2.5 w-full overflow-hidden rounded-full"
+                  style={{ background: "var(--surface-alt)", minWidth: "80px" }}
+                >
+                  {modelBreakdown.map((m) => {
+                    const pct = (m.tokens / total) * 100;
+                    if (pct < 1) return null;
+                    return (
+                      <div
+                        key={m.model}
+                        style={{
+                          width: `${pct}%`,
+                          backgroundColor: getModelColor(m.model),
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+                <div className="flex gap-2 mt-1">
+                  {modelBreakdown
+                    .filter((m) => m.tokens > 0)
+                    .map((m) => (
+                      <span
+                        key={m.model}
+                        className="flex items-center gap-1 text-[10px] text-slate-400"
+                      >
+                        <span
+                          className="inline-block h-1.5 w-1.5 rounded-full"
+                          style={{ backgroundColor: getModelColor(m.model) }}
+                        />
+                        {shortModelName(m.model)}
+                      </span>
+                    ))}
+                </div>
               </div>
-              <div className="flex gap-2 mt-1">
-                {modelBreakdown.filter((m) => m.tokens > 0).map((m) => (
-                  <span key={m.model} className="flex items-center gap-1 text-[10px] text-slate-400">
-                    <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ backgroundColor: getModelColor(m.model) }} />
-                    {shortModelName(m.model)}
-                  </span>
-                ))}
-              </div>
-            </div>
-          );
-        })() : (
-          <span className="text-slate-300 truncate">{trace.model ? shortModelName(trace.model) : "unknown"}</span>
+            );
+          })()
+        ) : (
+          <span className="text-slate-300 truncate">
+            {trace.model ? shortModelName(trace.model) : "unknown"}
+          </span>
         )}
       </td>
       <td className="px-4 py-2.5 text-right text-sm text-slate-400 align-middle">
@@ -130,7 +146,10 @@ export function SessionRow({ trace, expanded, onToggle, showProject, project, su
         </td>
       ) : null}
       {showCache ? (
-        <td className="px-4 py-2.5 text-right text-sm align-middle" style={{ color: "var(--text-muted)" }}>
+        <td
+          className="px-4 py-2.5 text-right text-sm align-middle"
+          style={{ color: "var(--text-muted)" }}
+        >
           {cacheCost && cacheCost > 0.01 ? formatUsd(cacheCost) : "—"}
         </td>
       ) : null}

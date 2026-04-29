@@ -12,8 +12,18 @@
     "url": "https://github.com/vjvkrm/langcost",
     "directory": "packages/cli"
   },
-  "keywords": ["llm", "ai", "agents", "cost", "optimization", "observability", "token"],
-  "files": ["src"],
+  "keywords": [
+    "llm",
+    "ai",
+    "agents",
+    "cost",
+    "optimization",
+    "observability",
+    "token"
+  ],
+  "files": [
+    "src"
+  ],
   "exports": {
     ".": "./src/index.ts"
   },

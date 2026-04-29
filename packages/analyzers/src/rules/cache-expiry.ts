@@ -31,8 +31,7 @@ export const cacheExpiryRule: WasteRule = {
         }
 
         // Check if this span had a large cache write (indicating cache miss / expiry)
-        const cacheWriteTokens =
-          getNumericMetadataValue(curr.metadata, "cacheCreationTokens") ?? 0;
+        const cacheWriteTokens = getNumericMetadataValue(curr.metadata, "cacheCreationTokens") ?? 0;
 
         if (cacheWriteTokens < MIN_CACHE_WRITE_TOKENS) {
           continue;
@@ -41,8 +40,7 @@ export const cacheExpiryRule: WasteRule = {
         // Estimate the extra cost: cache write price - cache read price for those tokens
         // At Opus 4.6: write=$10/M, read=$0.50/M → delta=$9.50/M
         // We approximate using a 19x multiplier (write/read ratio)
-        const cacheReadTokens =
-          getNumericMetadataValue(curr.metadata, "cacheReadTokens") ?? 0;
+        const cacheReadTokens = getNumericMetadataValue(curr.metadata, "cacheReadTokens") ?? 0;
         const totalContextTokens = cacheWriteTokens + cacheReadTokens;
 
         // The waste is the difference: what was paid (write) vs what could have been (read)

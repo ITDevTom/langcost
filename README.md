@@ -5,23 +5,17 @@
 </h1>
 
 <p align="center">
-  <strong>Cost intelligence for</strong>
-  &nbsp;
-  <a href="https://github.com/openclaw/openclaw">
-    <img src="apps/web/public/openclaw-logo-text-dark.svg" height="24" alt="OpenClaw" valign="middle" />
-  </a>
-  &nbsp;
-  <strong>agents</strong>
-  <br/><br/>
+  <strong>Cost intelligence for AI agents.</strong>
+  <br/>
   See where your tokens go. Find the waste. Fix it.
 </p>
 
 <p align="center">
   <a href="#quick-start"><img src="https://img.shields.io/badge/quick_start-▸-ff6b00?style=flat-square" alt="Quick Start" /></a>&nbsp;
+  <a href="#adapters"><img src="https://img.shields.io/badge/adapters-▸-ff6b00?style=flat-square" alt="Adapters" /></a>&nbsp;
   <a href="#features"><img src="https://img.shields.io/badge/features-▸-ff6b00?style=flat-square" alt="Features" /></a>&nbsp;
   <a href="#dashboard"><img src="https://img.shields.io/badge/dashboard-▸-ff6b00?style=flat-square" alt="Dashboard" /></a>&nbsp;
-  <a href="#cli-reference"><img src="https://img.shields.io/badge/CLI-▸-ff6b00?style=flat-square" alt="CLI" /></a>&nbsp;
-  <a href="#contributing"><img src="https://img.shields.io/badge/contributing-▸-ff6b00?style=flat-square" alt="Contributing" /></a>
+  <a href="#cli-reference"><img src="https://img.shields.io/badge/CLI-▸-ff6b00?style=flat-square" alt="CLI" /></a>
 </p>
 
 <p align="center">
@@ -45,14 +39,14 @@
 
 ## Why LangCost?
 
-You run [OpenClaw](https://github.com/openclaw/openclaw) and your LLM bill keeps climbing — but you can't tell *why*.
+Your LLM bill keeps climbing — but your provider dashboard only shows total tokens.
 
-The provider dashboard shows total tokens. It doesn't show that your agent **looped 12 times** on the same tool call, or that **30% of output tokens** were unnecessarily verbose, or that **prompt caching wasn't working**.
+It doesn't show that your agent **looped 12 times** on the same tool call, or that **30% of output tokens** were unnecessarily verbose, or that **prompt caching wasn't working**. It doesn't tell you *which session* burned $40 or *why* a trace failed.
 
-LangCost reads your session logs and tells you exactly what's wasting money:
+LangCost reads your agent logs and tells you exactly what's wasting money:
 
 ```
-Scanned 12 sessions from openclaw
+Scanned 12 sessions
 ├── 12 traces, 1,812 spans, 1,948 messages
 ├── Total cost: $73.24
 ├── Estimated waste: $8.60 (11.7%)
@@ -69,39 +63,40 @@ Scanned 12 sessions from openclaw
 
 ## Quick Start
 
-**Three commands. That's it.**
+**Pick your adapter, then three commands.**
 
 ```bash
-# Install the CLI + the OpenClaw adapter
-npm install -g langcost @langcost/adapter-openclaw
-# or: bun add -g langcost @langcost/adapter-openclaw
+# Install the CLI + the adapter for your agent framework
+npm install -g langcost @langcost/adapter-claude-code
+# or: npm install -g langcost @langcost/adapter-openclaw
 
 # Scan your sessions
-langcost scan --source openclaw
+langcost scan --source claude-code
+# or: langcost scan --source openclaw
 
 # Open the dashboard
 langcost dashboard
 ```
 
-> **Why two packages?** `langcost` is the core CLI — analysis engine, dashboard, and reports. Adapters are plugins that read data from specific sources. You install only the adapters you need. Right now OpenClaw is the only adapter — more are coming.
+LangCost auto-detects your agent's data directory, ingests your sessions, runs waste analysis, and serves a local dashboard at `http://localhost:3737`.
 
-LangCost auto-detects your OpenClaw installation at `~/.openclaw`, ingests your sessions, runs waste analysis, and serves a local dashboard at `http://localhost:3737`.
+> **Why two packages?** `langcost` is the core engine — analysis, dashboard, and reports. Adapters are plugins that read data from specific agent frameworks. Install only what you use.
 
 <details>
 <summary><strong>More options</strong></summary>
 
 ```bash
-# Point to a custom OpenClaw directory
-langcost scan --source openclaw --path /path/to/openclaw
+# Point to a custom data directory
+langcost scan --source claude-code --path /path/to/sessions
 
 # Analyze a single session file
-langcost scan --source openclaw --file /path/to/session.jsonl
+langcost scan --source claude-code --file /path/to/session.jsonl
 
 # Scan older sessions (default is last 30 days)
-langcost scan --source openclaw --since 90d
+langcost scan --source claude-code --since 90d
 
 # Force re-analysis of everything
-langcost scan --source openclaw --force
+langcost scan --source claude-code --force
 ```
 
 </details>
@@ -112,9 +107,43 @@ langcost scan --source openclaw --force
 
 <br/>
 
+## Adapters
+
+LangCost uses a plugin architecture — adapters translate agent-specific data into a normalized format the analysis engine understands. Install only the adapters you need.
+
+| Adapter | Install | Source | What it reads |
+|---------|---------|--------|---------------|
+| **Claude Code** | `@langcost/adapter-claude-code` | `~/.claude/projects/` | JSONL session logs from the Claude Code CLI |
+| **OpenClaw** | `@langcost/adapter-openclaw` | `~/.openclaw/` | JSONL session logs from OpenClaw agents |
+
+```bash
+# Use multiple adapters — scan from different sources into the same DB
+langcost scan --source claude-code
+langcost scan --source openclaw
+langcost dashboard  # unified view across all sources
+```
+
+### Build your own adapter
+
+Any npm package named `@langcost/adapter-<name>` that exports a default implementing `IAdapter` from `@langcost/core` is automatically discovered by the CLI.
+
+```bash
+# The CLI discovers your adapter automatically — no registration needed
+npm install -g @langcost/adapter-langfuse
+langcost scan --source langfuse
+```
+
+See [Contributing](#contributing) for the full adapter spec.
+
+<br/>
+
+---
+
+<br/>
+
 ## Features
 
-### 🔍 Waste Detection
+### Waste Detection
 
 Six rules that automatically find wasted spend in every session:
 
@@ -131,7 +160,7 @@ Every finding includes the **dollar amount wasted** and a **specific recommendat
 
 <br/>
 
-### 🔬 Trace Explorer
+### Trace Explorer
 
 Expand any session to see the full execution timeline — every LLM call and tool call in order:
 
@@ -151,7 +180,7 @@ Read exactly what the agent did, which tools it called, what failed, and what ea
 
 <br/>
 
-### 📊 Dashboard
+### Dashboard
 
 A local web UI at `localhost:3737`:
 
@@ -163,7 +192,7 @@ A local web UI at `localhost:3737`:
 
 <br/>
 
-### 💻 CLI Reports
+### CLI Reports
 
 ```bash
 # All sessions sorted by cost
@@ -191,7 +220,7 @@ langcost report --format json
 
 <br/>
 
-### 💰 22 Models Supported
+### 22 Models Supported
 
 Built-in pricing for Anthropic, OpenAI, Google, DeepSeek, and Mistral:
 
@@ -214,31 +243,31 @@ Using a self-hosted or unlisted model? Costs show as $0 but all token counts and
 ## How It Works
 
 ```
-  ~/.openclaw/sessions/*.jsonl
+  Agent session logs (any source)
          │
          ▼
-    ┌─────────┐
-    │  ingest  │  Read JSONL → normalize to traces, spans, messages
-    └────┬────┘
-         ▼
-    ┌─────────┐
-    │ analyze  │  Run 6 waste detection rules
-    └────┬────┘
-         ▼
-    ┌─────────┐
-    │  store   │  SQLite at ~/.langcost/langcost.db
-    └────┬────┘
-         │
-    ┌────┴────┐
-    ▼         ▼
-  CLI      Dashboard
- report   localhost:3737
+    ┌──────────┐
+    │  adapter  │  Source-specific → normalized traces, spans, messages
+    └─────┬────┘
+          ▼
+    ┌──────────┐
+    │  analyze  │  Run 6 waste detection rules (source-agnostic)
+    └─────┬────┘
+          ▼
+    ┌──────────┐
+    │   store   │  SQLite at ~/.langcost/langcost.db
+    └─────┬────┘
+          │
+    ┌─────┴─────┐
+    ▼           ▼
+  CLI        Dashboard
+ report    localhost:3737
 ```
 
 - Everything runs **locally** — no cloud, no API keys, no tracking
 - Data stays in a **single SQLite file** on your machine
 - Keeps the **500 most recent sessions** to manage disk space
-- **Plugin architecture** — adapters handle data ingestion, analyzers handle intelligence
+- **Plugin architecture** — adapters handle ingestion, analyzers handle intelligence, they never touch each other
 
 <br/>
 
@@ -253,7 +282,7 @@ Using a self-hosted or unlisted model? Costs show as $0 but all token counts and
 
 ```
 langcost scan --source <adapter> [options]
-  --source <adapter>      Required. "openclaw"
+  --source <adapter>      Required. e.g. "claude-code", "openclaw"
   --path <path>           Override data source path
   --file <path>           Analyze a single session file
   --since <duration>      Default: 30d. Accepts: 7d, 30d, 90d, all
@@ -311,7 +340,7 @@ langcost status
 |:---:|---------|-------------|
 | 🧭 | **Fault Attribution** | Trace failures backwards to find the root cause — not just which step errored, but which upstream agent caused it |
 | 🧩 | **More Waste Rules** | Unused tool schemas, duplicate RAG chunks, unbounded conversation history, uncached system prompts |
-| 🔌 | **More Adapters** | Pluggable data sources beyond OpenClaw — bring your own traces |
+| 🔌 | **More Adapters** | Langfuse, LangSmith, custom JSONL formats — bring your own traces |
 | 🏷️ | **Custom Model Pricing** | Set input/output/cache prices for self-hosted and unlisted models |
 
 <br/>
@@ -322,13 +351,13 @@ langcost status
 
 ## Contributing
 
-LangCost has a plugin architecture. Three easy ways to contribute:
+LangCost has a plugin architecture. Three ways to contribute:
 
-> **🧩 Add a waste rule** — standalone function in `packages/analyzers/src/rules/`. Copy an existing rule as a starting point.
+> **🧩 Add a waste rule** — standalone function in `packages/analyzers/src/rules/`. Copy an existing rule as a starting point. Rules are source-agnostic and never import adapters.
 
 > **💲 Update model pricing** — edit `packages/core/src/pricing/providers.ts`. Add new models or fix outdated prices.
 
-> **🔌 Build an adapter** — npm package implementing `IAdapter` from `@langcost/core`. The CLI discovers it automatically.
+> **🔌 Build an adapter** — create an npm package named `@langcost/adapter-<name>` implementing `IAdapter` from `@langcost/core`. The CLI discovers and loads it automatically — no registration needed.
 
 <br/>
 

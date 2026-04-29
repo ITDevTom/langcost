@@ -140,7 +140,7 @@ export async function runReportCommand(
         if (!subagentsByParent.has(parentTraceId)) {
           subagentsByParent.set(parentTraceId, []);
         }
-        subagentsByParent.get(parentTraceId)!.push(trace);
+        subagentsByParent.get(parentTraceId)?.push(trace);
       } else {
         parentTraces.push(trace);
       }

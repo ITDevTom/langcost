@@ -15,7 +15,7 @@ import { formatCompactInt, formatPercent, formatRelativeTime, formatUsd } from "
 interface SessionsProps {
   refreshToken: number;
   onNavigate: (path: string) => void;
-  source?: string;
+  source?: string | undefined;
   billingMode: "subscription" | "api";
 }
 
@@ -33,6 +33,7 @@ export function Sessions({ refreshToken, onNavigate, source, billingMode }: Sess
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [details, setDetails] = useState<Record<string, TraceDetailResponse>>({});
   const [loadingDetails, setLoadingDetails] = useState<Set<string>>(new Set());
+  const [showProjectCol, setShowProjectCol] = useState(true);
 
   useEffect(() => {
     void refreshToken;
@@ -48,7 +49,7 @@ export function Sessions({ refreshToken, onNavigate, source, billingMode }: Sess
             limit: PAGE_SIZE,
             offset: (page - 1) * PAGE_SIZE,
             sort,
-            source,
+            ...(source ? { source } : {}),
             ...(statusFilter !== "all" ? { status: statusFilter } : {}),
           }),
           getOverview(source),
@@ -115,6 +116,28 @@ export function Sessions({ refreshToken, onNavigate, source, billingMode }: Sess
   const showCost = isApi;
   const showCache = isApi && isClaudeCode;
   const showWaste = isApi;
+  const showProject = isClaudeCode && showProjectCol;
+
+  const lastUnder = sort.lastIndexOf("_");
+  const sortCol = sort.slice(0, lastUnder);
+  const sortDir = sort.slice(lastUnder + 1) as "asc" | "desc";
+
+  function sortHeader(col: string, label: string, align: "left" | "right" = "right") {
+    const isActive = sortCol === col;
+    const next = isActive && sortDir === "desc" ? `${col}_asc` : `${col}_desc`;
+    return (
+      <th
+        className={`px-4 py-3 text-${align} font-medium cursor-pointer select-none whitespace-nowrap transition-colors ${isActive ? "text-slate-200" : "hover:text-slate-300"}`}
+        onClick={() => {
+          setSort(next);
+          setPage(1);
+        }}
+      >
+        {label}
+        {isActive ? (sortDir === "desc" ? " ↓" : " ↑") : ""}
+      </th>
+    );
+  }
 
   // Group subagent traces under their parent for claude-code
   const { parentTraces, subagentsByParent } = (() => {
@@ -122,11 +145,13 @@ export function Sessions({ refreshToken, onNavigate, source, billingMode }: Sess
     const subs = new Map<string, TraceSummary[]>();
 
     for (const trace of traces) {
-      const parentId = (trace.metadata as Record<string, unknown> | null)?.parentConversationId as string | null;
+      const parentId = (trace.metadata as Record<string, unknown> | null)?.parentConversationId as
+        | string
+        | null;
       if (parentId) {
         const parentTraceId = `${trace.source}:trace:${parentId}`;
         if (!subs.has(parentTraceId)) subs.set(parentTraceId, []);
-        subs.get(parentTraceId)!.push(trace);
+        subs.get(parentTraceId)?.push(trace);
       } else {
         parents.push(trace);
       }
@@ -138,12 +163,17 @@ export function Sessions({ refreshToken, onNavigate, source, billingMode }: Sess
   // Roll up subagent totals
   function getCacheCost(trace: TraceSummary): number {
     const meta = trace.metadata as Record<string, unknown> | null;
-    const readTokens = typeof meta?.totalCacheReadTokens === "number" ? meta.totalCacheReadTokens : 0;
-    const writeTokens = typeof meta?.totalCacheCreationTokens === "number" ? meta.totalCacheCreationTokens : 0;
+    const readTokens =
+      typeof meta?.totalCacheReadTokens === "number" ? meta.totalCacheReadTokens : 0;
+    const writeTokens =
+      typeof meta?.totalCacheCreationTokens === "number" ? meta.totalCacheCreationTokens : 0;
     return (readTokens / 1_000_000) * 0.5 + (writeTokens / 1_000_000) * 10;
   }
 
-  interface ModelTokens { model: string; tokens: number }
+  interface ModelTokens {
+    model: string;
+    tokens: number;
+  }
 
   function getModelBreakdown(trace: TraceSummary, subagents: TraceSummary[]): ModelTokens[] {
     const byModel = new Map<string, number>();
@@ -158,26 +188,42 @@ export function Sessions({ refreshToken, onNavigate, source, billingMode }: Sess
       .sort((a, b) => b.tokens - a.tokens);
   }
 
-  function getDisplayTrace(trace: TraceSummary): TraceSummary & { subagentCount: number; project?: string; cacheCost: number; modelBreakdown: ModelTokens[] } {
+  function getDisplayTrace(trace: TraceSummary): TraceSummary & {
+    project?: string | undefined;
+    cacheCost: number;
+    modelBreakdown: ModelTokens[];
+  } {
     const subagents = subagentsByParent.get(trace.id) ?? [];
-    const project = (trace.metadata as Record<string, unknown> | null)?.project as string | undefined;
+    const project = (trace.metadata as Record<string, unknown> | null)?.project as
+      | string
+      | undefined;
     return {
       ...trace,
-      totalInputTokens: trace.totalInputTokens + subagents.reduce((sum, sa) => sum + sa.totalInputTokens, 0),
-      totalOutputTokens: trace.totalOutputTokens + subagents.reduce((sum, sa) => sum + sa.totalOutputTokens, 0),
+      totalInputTokens:
+        trace.totalInputTokens + subagents.reduce((sum, sa) => sum + sa.totalInputTokens, 0),
+      totalOutputTokens:
+        trace.totalOutputTokens + subagents.reduce((sum, sa) => sum + sa.totalOutputTokens, 0),
       totalCostUsd: trace.totalCostUsd + subagents.reduce((sum, sa) => sum + sa.totalCostUsd, 0),
       wasteUsd: trace.wasteUsd + subagents.reduce((sum, sa) => sum + sa.wasteUsd, 0),
       spanCount: trace.spanCount + subagents.reduce((sum, sa) => sum + sa.spanCount, 0),
-      subagentCount: subagents.length,
       project,
       cacheCost: getCacheCost(trace) + subagents.reduce((sum, sa) => sum + getCacheCost(sa), 0),
       modelBreakdown: getModelBreakdown(trace, subagents),
     };
   }
 
-  const displayTraces = parentTraces.map(getDisplayTrace);
+  const displayTraces = (() => {
+    const mapped = parentTraces.map(getDisplayTrace);
+    if (sortCol === "cache") {
+      return [...mapped].sort((a, b) =>
+        sortDir === "desc" ? b.cacheCost - a.cacheCost : a.cacheCost - b.cacheCost,
+      );
+    }
+    return mapped;
+  })();
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const colSpan = (isClaudeCode ? 6 : 5) + (showCost ? 1 : 0) + (showCache ? 1 : 0) + (showWaste ? 1 : 0);
+  const colSpan =
+    (showProject ? 7 : 6) + (showCost ? 1 : 0) + (showCache ? 1 : 0) + (showWaste ? 1 : 0);
 
   return (
     <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-5">
@@ -190,8 +236,8 @@ export function Sessions({ refreshToken, onNavigate, source, billingMode }: Sess
               </span>
               <span className="stat-strip__separator">|</span>
               <span className="stat-strip__item">
-                <span className="stat-strip__label">Waste:</span> {formatUsd(overview.totalWastedUsd)} (
-                {formatPercent(overview.wastePercentage)})
+                <span className="stat-strip__label">Waste:</span>{" "}
+                {formatUsd(overview.totalWastedUsd)} ({formatPercent(overview.wastePercentage)})
               </span>
               <span className="stat-strip__separator">|</span>
             </>
@@ -199,25 +245,27 @@ export function Sessions({ refreshToken, onNavigate, source, billingMode }: Sess
           <span className="stat-strip__item">
             <span className="stat-strip__label">Sessions:</span> {parentTraces.length}
           </span>
-          {showCache && (overview.totalCacheReadTokens > 0 || overview.totalCacheWriteTokens > 0) ? (() => {
-            const cacheReadCost = (overview.totalCacheReadTokens / 1_000_000) * 0.5;
-            const cacheWriteCost = (overview.totalCacheWriteTokens / 1_000_000) * 10;
-            const totalCacheCost = cacheReadCost + cacheWriteCost;
-            return (
-              <>
-                <span className="stat-strip__separator">|</span>
-                <span
-                  className="stat-strip__item"
-                  title={`Cache read: ${formatCompactInt(overview.totalCacheReadTokens)} tokens → ${formatUsd(cacheReadCost)}\nCache write: ${formatCompactInt(overview.totalCacheWriteTokens)} tokens → ${formatUsd(cacheWriteCost)}`}
-                >
-                  <span className="stat-strip__label">Cache:</span>{" "}
-                  <span style={{ color: "var(--text-muted)" }}>
-                    {formatUsd(totalCacheCost)}
-                  </span>
-                </span>
-              </>
-            );
-          })() : null}
+          {showCache && (overview.totalCacheReadTokens > 0 || overview.totalCacheWriteTokens > 0)
+            ? (() => {
+                const cacheReadCost = (overview.totalCacheReadTokens / 1_000_000) * 0.5;
+                const cacheWriteCost = (overview.totalCacheWriteTokens / 1_000_000) * 10;
+                const totalCacheCost = cacheReadCost + cacheWriteCost;
+                return (
+                  <>
+                    <span className="stat-strip__separator">|</span>
+                    <span
+                      className="stat-strip__item"
+                      title={`Cache read: ${formatCompactInt(overview.totalCacheReadTokens)} tokens → ${formatUsd(cacheReadCost)}\nCache write: ${formatCompactInt(overview.totalCacheWriteTokens)} tokens → ${formatUsd(cacheWriteCost)}`}
+                    >
+                      <span className="stat-strip__label">Cache:</span>{" "}
+                      <span style={{ color: "var(--text-muted)" }}>
+                        {formatUsd(totalCacheCost)}
+                      </span>
+                    </span>
+                  </>
+                );
+              })()
+            : null}
           <span className="stat-strip__separator">|</span>
           <span className="stat-strip__item">
             <span className="stat-strip__label">Last scan:</span>{" "}
@@ -235,21 +283,15 @@ export function Sessions({ refreshToken, onNavigate, source, billingMode }: Sess
         </h1>
 
         <div className="flex flex-wrap items-center gap-3">
-          <label className="text-sm text-slate-400">
-            <span className="mr-2">Sort</span>
-            <select
-              value={sort}
-              onChange={(event) => {
-                setSort(event.target.value);
-                setPage(1);
-              }}
-              className="field-shell rounded-xl px-3 py-2"
+          {isClaudeCode ? (
+            <button
+              type="button"
+              onClick={() => setShowProjectCol((prev) => !prev)}
+              className="button-secondary rounded-xl px-3 py-2 text-sm"
             >
-              <option value="date_desc">Date</option>
-              <option value="cost_desc">Cost</option>
-              <option value="waste_desc">Waste</option>
-            </select>
-          </label>
+              {showProjectCol ? "Hide Project" : "Show Project"}
+            </button>
+          ) : null}
 
           <label className="text-sm text-slate-400">
             <span className="mr-2">Filter</span>
@@ -282,7 +324,7 @@ export function Sessions({ refreshToken, onNavigate, source, billingMode }: Sess
             <table className="trace-table min-w-[1160px] w-full table-fixed border-collapse">
               <colgroup>
                 <col style={{ width: "80px" }} />
-                {isClaudeCode ? <col style={{ width: "110px" }} /> : null}
+                {showProject ? <col style={{ width: "110px" }} /> : null}
                 <col />
                 <col style={{ width: "14%" }} />
                 <col style={{ width: "70px" }} />
@@ -295,15 +337,17 @@ export function Sessions({ refreshToken, onNavigate, source, billingMode }: Sess
               <thead>
                 <tr className="border-b border-[color:var(--border)] text-xs tracking-[0.18em] text-slate-500 uppercase">
                   <th className="px-4 py-3 text-left font-medium">Status</th>
-                  {isClaudeCode ? <th className="px-4 py-3 text-left font-medium">Project</th> : null}
-                  <th className="px-4 py-3 text-left font-medium">Session</th>
+                  {showProject ? (
+                    <th className="px-4 py-3 text-left font-medium">Project</th>
+                  ) : null}
+                  {sortHeader("date", "Session", "left")}
                   <th className="px-4 py-3 text-left font-medium">Model</th>
-                  <th className="px-4 py-3 text-right font-medium">Spans</th>
-                  <th className="px-4 py-3 text-right font-medium">Input</th>
-                  <th className="px-4 py-3 text-right font-medium">Output</th>
-                  {showCost ? <th className="px-4 py-3 text-right font-medium">Cost</th> : null}
-                  {showCache ? <th className="px-4 py-3 text-right font-medium">Cache</th> : null}
-                  {showWaste ? <th className="px-4 py-3 text-right font-medium">Waste</th> : null}
+                  {sortHeader("spans", "Spans")}
+                  {sortHeader("input", "Input")}
+                  {sortHeader("output", "Output")}
+                  {showCost ? sortHeader("cost", "Cost") : null}
+                  {showCache ? sortHeader("cache", "Cache") : null}
+                  {showWaste ? sortHeader("waste", "Waste") : null}
                 </tr>
               </thead>
               <tbody>
@@ -315,9 +359,8 @@ export function Sessions({ refreshToken, onNavigate, source, billingMode }: Sess
                         trace={trace}
                         expanded={expanded}
                         onToggle={() => void toggleRow(trace.id)}
-                        showProject={isClaudeCode}
+                        showProject={showProject}
                         project={trace.project}
-                        subagentCount={trace.subagentCount}
                         showCost={showCost}
                         showCache={showCache}
                         cacheCost={trace.cacheCost}

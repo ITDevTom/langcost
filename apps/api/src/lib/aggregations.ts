@@ -127,7 +127,10 @@ export function buildOverviewPayload(
       outputTokens: sumBy(items, (item) => item.totalOutputTokens),
       traceCount: items.length,
     }))
-    .sort((left, right) => (right.inputTokens + right.outputTokens) - (left.inputTokens + left.outputTokens));
+    .sort(
+      (left, right) =>
+        right.inputTokens + right.outputTokens - (left.inputTokens + left.outputTokens),
+    );
 
   return {
     totalTraces: traces.length,
@@ -199,7 +202,10 @@ export function buildOverviewPayload(
     }, 0),
     totalCacheWriteTokens: traces.reduce((sum, t) => {
       const meta = t.metadata as Record<string, unknown> | null;
-      return sum + (typeof meta?.totalCacheCreationTokens === "number" ? meta.totalCacheCreationTokens : 0);
+      return (
+        sum +
+        (typeof meta?.totalCacheCreationTokens === "number" ? meta.totalCacheCreationTokens : 0)
+      );
     }, 0),
     lastScanAt:
       traces.length > 0
@@ -209,10 +215,14 @@ export function buildOverviewPayload(
 }
 
 const CATEGORY_DESCRIPTIONS: Record<string, string> = {
-  tool_failure_waste: "Tool calls are failing and triggering extra model work to recover. Review failing tool paths and error handling.",
-  agent_loop: "Sub-agents are repeating the same tool calls in loops. Add loop guards or stopping conditions.",
-  retry_waste: "Duplicate or near-duplicate prompts are being sent. Improve initial prompt clarity.",
-  low_cache_utilization: "Some spans have low cache hit rates. Consider restructuring prompts to maximize cache reuse.",
+  tool_failure_waste:
+    "Tool calls are failing and triggering extra model work to recover. Review failing tool paths and error handling.",
+  agent_loop:
+    "Sub-agents are repeating the same tool calls in loops. Add loop guards or stopping conditions.",
+  retry_waste:
+    "Duplicate or near-duplicate prompts are being sent. Improve initial prompt clarity.",
+  low_cache_utilization:
+    "Some spans have low cache hit rates. Consider restructuring prompts to maximize cache reuse.",
   high_output: "Some LLM responses are unusually verbose. Consider stricter output limits.",
   cache_expiry: "Idle gaps are causing cache expiry. Keep the cache warm during long pauses.",
 };
@@ -242,19 +252,45 @@ export function buildRecommendations(wasteReports: WasteReportRecord[]) {
     .sort((left, right) => right.estimatedSavingsUsd - left.estimatedSavingsUsd);
 }
 
-export function sortTraces(traces: Array<TraceRecord & { wasteUsd: number }>, sort: string) {
+function cacheCost(t: { metadata?: Record<string, unknown> }): number {
+  const m = t.metadata ?? {};
+  const read = typeof m.totalCacheReadTokens === "number" ? m.totalCacheReadTokens : 0;
+  const write = typeof m.totalCacheCreationTokens === "number" ? m.totalCacheCreationTokens : 0;
+  return (read / 1_000_000) * 0.5 + (write / 1_000_000) * 10;
+}
+
+export function sortTraces(
+  traces: Array<TraceRecord & { wasteUsd: number; spanCount: number }>,
+  sort: string,
+) {
   return [...traces].sort((left, right) => {
     switch (sort) {
       case "cost_asc":
         return left.totalCostUsd - right.totalCostUsd;
+      case "cost_desc":
+        return right.totalCostUsd - left.totalCostUsd;
       case "waste_desc":
         return right.wasteUsd - left.wasteUsd;
       case "waste_asc":
         return left.wasteUsd - right.wasteUsd;
       case "date_asc":
         return left.startedAt.getTime() - right.startedAt.getTime();
-      case "cost_desc":
-        return right.totalCostUsd - left.totalCostUsd;
+      case "spans_desc":
+        return right.spanCount - left.spanCount;
+      case "spans_asc":
+        return left.spanCount - right.spanCount;
+      case "input_desc":
+        return right.totalInputTokens - left.totalInputTokens;
+      case "input_asc":
+        return left.totalInputTokens - right.totalInputTokens;
+      case "output_desc":
+        return right.totalOutputTokens - left.totalOutputTokens;
+      case "output_asc":
+        return left.totalOutputTokens - right.totalOutputTokens;
+      case "cache_desc":
+        return cacheCost(right) - cacheCost(left);
+      case "cache_asc":
+        return cacheCost(left) - cacheCost(right);
       default:
         return right.startedAt.getTime() - left.startedAt.getTime();
     }

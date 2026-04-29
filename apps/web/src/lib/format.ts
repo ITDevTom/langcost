@@ -136,16 +136,6 @@ export function formatCategoryLabel(category: string): string {
   }
 }
 
-export function statusDotClass(status: TraceStatus | "ok"): string {
-  switch (status) {
-    case "error":
-      return "bg-red-400";
-    case "partial":
-      return "bg-yellow-300";
-    default:
-      return "bg-emerald-400";
-  }
-}
 
 export function statusClasses(status: TraceStatus | "ok"): string {
   switch (status) {

@@ -67,9 +67,7 @@
       "indexes": {
         "idx_analysis_runs_analyzer_name": {
           "name": "idx_analysis_runs_analyzer_name",
-          "columns": [
-            "analyzer_name"
-          ],
+          "columns": ["analyzer_name"],
           "isUnique": false
         }
       },
@@ -153,9 +151,7 @@
       "indexes": {
         "idx_fault_reports_trace_id": {
           "name": "idx_fault_reports_trace_id",
-          "columns": [
-            "trace_id"
-          ],
+          "columns": ["trace_id"],
           "isUnique": false
         }
       },
@@ -164,12 +160,8 @@
           "name": "fault_reports_trace_id_traces_id_fk",
           "tableFrom": "fault_reports",
           "tableTo": "traces",
-          "columnsFrom": [
-            "trace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -177,12 +169,8 @@
           "name": "fault_reports_fault_span_id_spans_id_fk",
           "tableFrom": "fault_reports",
           "tableTo": "spans",
-          "columnsFrom": [
-            "fault_span_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["fault_span_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -190,12 +178,8 @@
           "name": "fault_reports_root_cause_span_id_spans_id_fk",
           "tableFrom": "fault_reports",
           "tableTo": "spans",
-          "columnsFrom": [
-            "root_cause_span_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["root_cause_span_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -324,10 +308,7 @@
       "indexes": {
         "idx_messages_trace_id_position": {
           "name": "idx_messages_trace_id_position",
-          "columns": [
-            "trace_id",
-            "position"
-          ],
+          "columns": ["trace_id", "position"],
           "isUnique": false
         }
       },
@@ -336,12 +317,8 @@
           "name": "messages_span_id_spans_id_fk",
           "tableFrom": "messages",
           "tableTo": "spans",
-          "columnsFrom": [
-            "span_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["span_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -349,12 +326,8 @@
           "name": "messages_trace_id_traces_id_fk",
           "tableFrom": "messages",
           "tableTo": "traces",
-          "columnsFrom": [
-            "trace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -452,10 +425,7 @@
       "indexes": {
         "idx_segments_trace_id_type": {
           "name": "idx_segments_trace_id_type",
-          "columns": [
-            "trace_id",
-            "type"
-          ],
+          "columns": ["trace_id", "type"],
           "isUnique": false
         }
       },
@@ -464,12 +434,8 @@
           "name": "segments_span_id_spans_id_fk",
           "tableFrom": "segments",
           "tableTo": "spans",
-          "columnsFrom": [
-            "span_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["span_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -477,12 +443,8 @@
           "name": "segments_trace_id_traces_id_fk",
           "tableFrom": "segments",
           "tableTo": "traces",
-          "columnsFrom": [
-            "trace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -681,9 +643,7 @@
       "indexes": {
         "idx_spans_trace_id": {
           "name": "idx_spans_trace_id",
-          "columns": [
-            "trace_id"
-          ],
+          "columns": ["trace_id"],
           "isUnique": false
         }
       },
@@ -692,12 +652,8 @@
           "name": "spans_trace_id_traces_id_fk",
           "tableFrom": "spans",
           "tableTo": "traces",
-          "columnsFrom": [
-            "trace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -705,12 +661,8 @@
           "name": "spans_parent_span_id_spans_id_fk",
           "tableFrom": "spans",
           "tableTo": "spans",
-          "columnsFrom": [
-            "parent_span_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["parent_span_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -836,9 +788,7 @@
       "indexes": {
         "idx_traces_started_at": {
           "name": "idx_traces_started_at",
-          "columns": [
-            "started_at"
-          ],
+          "columns": ["started_at"],
           "isUnique": false
         }
       },
@@ -943,10 +893,7 @@
       "indexes": {
         "idx_waste_reports_trace_id_category": {
           "name": "idx_waste_reports_trace_id_category",
-          "columns": [
-            "trace_id",
-            "category"
-          ],
+          "columns": ["trace_id", "category"],
           "isUnique": false
         }
       },
@@ -955,12 +902,8 @@
           "name": "waste_reports_trace_id_traces_id_fk",
           "tableFrom": "waste_reports",
           "tableTo": "traces",
-          "columnsFrom": [
-            "trace_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["trace_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -968,12 +911,8 @@
           "name": "waste_reports_span_id_spans_id_fk",
           "tableFrom": "waste_reports",
           "tableTo": "spans",
-          "columnsFrom": [
-            "span_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["span_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }

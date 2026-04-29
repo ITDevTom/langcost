@@ -121,12 +121,7 @@ describe("discoverConversationFiles", () => {
   });
 
   it("discovers a single file by path", async () => {
-    const fixturePath = join(
-      process.cwd(),
-      "fixtures",
-      "claude-code",
-      "simple-conversation.jsonl",
-    );
+    const fixturePath = join(process.cwd(), "fixtures", "claude-code", "simple-conversation.jsonl");
 
     const discovered = await discoverConversationFiles({ file: fixturePath });
 

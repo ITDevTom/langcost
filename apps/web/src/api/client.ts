@@ -348,7 +348,13 @@ export async function getTraceDetail(traceId: string): Promise<TraceDetailRespon
 }
 
 export async function getWaste(
-  params: { category?: string; severity?: string; limit?: number; offset?: number; source?: string } = {},
+  params: {
+    category?: string;
+    severity?: string;
+    limit?: number;
+    offset?: number;
+    source?: string;
+  } = {},
 ): Promise<WasteListResponse> {
   return request<WasteListResponse>(
     `/waste${buildQuery({

@@ -70,15 +70,14 @@ export function calculateCostWithCache(
     };
   }
 
-  const cacheWritePrice = cacheDuration === "1h"
-    ? pricing.cacheWrite1hInputPricePerMToken
-    : pricing.cacheWrite5mInputPricePerMToken;
+  const cacheWritePrice =
+    cacheDuration === "1h"
+      ? pricing.cacheWrite1hInputPricePerMToken
+      : pricing.cacheWrite5mInputPricePerMToken;
 
   const inputCost = (inputTokens / 1_000_000) * pricing.inputPricePerMToken;
   const outputCost = (outputTokens / 1_000_000) * pricing.outputPricePerMToken;
-  const cacheWriteCost = cacheWritePrice
-    ? (cacheCreationTokens / 1_000_000) * cacheWritePrice
-    : 0;
+  const cacheWriteCost = cacheWritePrice ? (cacheCreationTokens / 1_000_000) * cacheWritePrice : 0;
   const cacheReadCost = pricing.cachedInputPricePerMToken
     ? (cacheReadTokens / 1_000_000) * pricing.cachedInputPricePerMToken
     : 0;

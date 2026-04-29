@@ -45,7 +45,14 @@ export const MODEL_PRICING: ModelPricing[] = [
   {
     provider: "anthropic",
     model: "claude-sonnet-4-20250514",
-    aliases: ["claude-sonnet-4", "claude-sonnet-4-5", "claude-sonnet-4-6", "sonnet-4", "sonnet-4-5", "sonnet-4-6"],
+    aliases: [
+      "claude-sonnet-4",
+      "claude-sonnet-4-5",
+      "claude-sonnet-4-6",
+      "sonnet-4",
+      "sonnet-4-5",
+      "sonnet-4-6",
+    ],
     inputPricePerMToken: 3,
     outputPricePerMToken: 15,
     cachedInputPricePerMToken: 0.3,

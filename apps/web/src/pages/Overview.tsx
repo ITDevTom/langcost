@@ -12,7 +12,7 @@ import { formatCompactInt, formatPercent, formatRelativeTime, formatUsd } from "
 interface OverviewProps {
   refreshToken: number;
   onNavigate: (path: string) => void;
-  source?: string;
+  source?: string | undefined;
   billingMode: "subscription" | "api";
 }
 
@@ -74,7 +74,8 @@ export function Overview({ refreshToken, onNavigate, source, billingMode }: Over
 
   const isApi = billingMode === "api";
   const totalTokens = overview.costByModel.reduce(
-    (sum, m) => sum + (m.inputTokens ?? 0) + (m.outputTokens ?? 0), 0,
+    (sum, m) => sum + (m.inputTokens ?? 0) + (m.outputTokens ?? 0),
+    0,
   );
   const sr = overview.successRate ?? { complete: 0, error: 0, partial: 0, completePercent: 0 };
   const turns = overview.turns ?? { avg: 0, min: 0, max: 0, total: 0 };
@@ -89,8 +90,8 @@ export function Overview({ refreshToken, onNavigate, source, billingMode }: Over
             </span>
             <span className="stat-strip__separator">|</span>
             <span className="stat-strip__item">
-              <span className="stat-strip__label">Waste:</span> {formatUsd(overview.totalWastedUsd)} (
-              {formatPercent(overview.wastePercentage)})
+              <span className="stat-strip__label">Waste:</span> {formatUsd(overview.totalWastedUsd)}{" "}
+              ({formatPercent(overview.wastePercentage)})
             </span>
             <span className="stat-strip__separator">|</span>
           </>
@@ -105,7 +106,11 @@ export function Overview({ refreshToken, onNavigate, source, billingMode }: Over
         <span className="stat-strip__separator">|</span>
         <span className="stat-strip__item">
           <span className="stat-strip__label">Success:</span>{" "}
-          <span style={{ color: sr.completePercent >= 50 ? "var(--accent-green)" : "var(--accent-red)" }}>
+          <span
+            style={{
+              color: sr.completePercent >= 50 ? "var(--accent-green)" : "var(--accent-red)",
+            }}
+          >
             {formatPercent(sr.completePercent)}
           </span>
         </span>
@@ -155,24 +160,41 @@ export function Overview({ refreshToken, onNavigate, source, billingMode }: Over
               </thead>
               <tbody>
                 {overview.byProject.map((p) => (
-                  <tr key={p.project} className="border-b border-[color:var(--border)] last:border-b-0">
-                    <td className="px-3 py-2.5 font-medium" style={{ color: "var(--accent-orange, #ff6b00)" }}>
+                  <tr
+                    key={p.project}
+                    className="border-b border-[color:var(--border)] last:border-b-0"
+                  >
+                    <td
+                      className="px-3 py-2.5 font-medium"
+                      style={{ color: "var(--accent-orange, #ff6b00)" }}
+                    >
                       {p.project}
                     </td>
                     <td className="px-3 py-2.5 text-right text-slate-300">{p.sessions}</td>
                     <td className="px-3 py-2.5 text-right text-slate-300">
-                      <span title={`in: ${formatCompactInt(p.totalInputTokens)} | out: ${formatCompactInt(p.totalOutputTokens)}`}>
+                      <span
+                        title={`in: ${formatCompactInt(p.totalInputTokens)} | out: ${formatCompactInt(p.totalOutputTokens)}`}
+                      >
                         {formatCompactInt(p.totalTokens)}
                       </span>
                     </td>
                     <td className="px-3 py-2.5 text-right text-slate-300">{p.avgTurns}</td>
                     <td className="px-3 py-2.5 text-right">
-                      <span style={{ color: p.successRate >= 50 ? "var(--accent-green, #10b981)" : "var(--accent-red, #ef4444)" }}>
+                      <span
+                        style={{
+                          color:
+                            p.successRate >= 50
+                              ? "var(--accent-green, #10b981)"
+                              : "var(--accent-red, #ef4444)",
+                        }}
+                      >
                         {formatPercent(p.successRate)}
                       </span>
                     </td>
                     {isApi ? (
-                      <td className="px-3 py-2.5 text-right text-slate-300">{formatUsd(p.totalCostUsd)}</td>
+                      <td className="px-3 py-2.5 text-right text-slate-300">
+                        {formatUsd(p.totalCostUsd)}
+                      </td>
                     ) : null}
                   </tr>
                 ))}
@@ -188,9 +210,7 @@ export function Overview({ refreshToken, onNavigate, source, billingMode }: Over
             <div>
               <div className="section-kicker">Actions</div>
               <h2 className="text-lg font-semibold text-slate-100">Top Recommendations</h2>
-              <p className="section-copy mt-1 text-sm">
-                Actionable insights from your sessions
-              </p>
+              <p className="section-copy mt-1 text-sm">Actionable insights from your sessions</p>
             </div>
             <button type="button" onClick={() => onNavigate("/")} className="button-ghost">
               Open traces
@@ -237,42 +257,53 @@ export function Overview({ refreshToken, onNavigate, source, billingMode }: Over
           </p>
 
           <div className="mt-4 space-y-3">
-            {overview.costByModel.filter((m) => m.inputTokens + m.outputTokens > 0).map((entry) => {
-              const entryTokens = entry.inputTokens + entry.outputTokens;
-              const pct = totalTokens > 0 ? (entryTokens / totalTokens) * 100 : 0;
-              const shortModel = entry.model.replace("claude-", "").replace(/-20\d+/g, "");
-              const lower = entry.model.toLowerCase();
-              const barColor = lower.includes("opus") ? "#ff6b00" : lower.includes("sonnet") ? "#3b82f6" : lower.includes("haiku") ? "#10b981" : "#6b7280";
-              return (
-                <div key={entry.model} className="soft-card">
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <span className="text-sm font-medium text-slate-100">{shortModel}</span>
-                    <span className="text-sm text-slate-400">
-                      {entry.traceCount} sessions
-                      {isApi ? ` · ${formatUsd(entry.costUsd)}` : ""}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: "var(--surface-alt)" }}>
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${Math.max(2, pct)}%`,
-                          backgroundColor: barColor,
-                        }}
-                      />
+            {overview.costByModel
+              .filter((m) => m.inputTokens + m.outputTokens > 0)
+              .map((entry) => {
+                const entryTokens = entry.inputTokens + entry.outputTokens;
+                const pct = totalTokens > 0 ? (entryTokens / totalTokens) * 100 : 0;
+                const shortModel = entry.model.replace("claude-", "").replace(/-20\d+/g, "");
+                const lower = entry.model.toLowerCase();
+                const barColor = lower.includes("opus")
+                  ? "#ff6b00"
+                  : lower.includes("sonnet")
+                    ? "#3b82f6"
+                    : lower.includes("haiku")
+                      ? "#10b981"
+                      : "#6b7280";
+                return (
+                  <div key={entry.model} className="soft-card">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <span className="text-sm font-medium text-slate-100">{shortModel}</span>
+                      <span className="text-sm text-slate-400">
+                        {entry.traceCount} sessions
+                        {isApi ? ` · ${formatUsd(entry.costUsd)}` : ""}
+                      </span>
                     </div>
-                    <span className="text-sm font-medium text-slate-300 w-16 text-right">
-                      {formatPercent(pct)}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="flex-1 h-2.5 rounded-full overflow-hidden"
+                        style={{ background: "var(--surface-alt)" }}
+                      >
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${Math.max(2, pct)}%`,
+                            backgroundColor: barColor,
+                          }}
+                        />
+                      </div>
+                      <span className="text-sm font-medium text-slate-300 w-16 text-right">
+                        {formatPercent(pct)}
+                      </span>
+                    </div>
+                    <div className="flex gap-4 mt-1 text-xs text-slate-500">
+                      <span>in: {formatCompactInt(entry.inputTokens)}</span>
+                      <span>out: {formatCompactInt(entry.outputTokens)}</span>
+                    </div>
                   </div>
-                  <div className="flex gap-4 mt-1 text-xs text-slate-500">
-                    <span>in: {formatCompactInt(entry.inputTokens)}</span>
-                    <span>out: {formatCompactInt(entry.outputTokens)}</span>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         </div>
       </section>

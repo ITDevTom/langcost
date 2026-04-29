@@ -6,13 +6,13 @@ export interface AdapterMeta {
 }
 
 export interface IngestOptions {
-  sourcePath?: string;
-  file?: string;
-  apiKey?: string;
-  apiUrl?: string;
-  since?: Date;
-  force?: boolean;
-  onProgress?: (event: IngestProgressEvent) => void;
+  sourcePath?: string | undefined;
+  file?: string | undefined;
+  apiKey?: string | undefined;
+  apiUrl?: string | undefined;
+  since?: Date | undefined;
+  force?: boolean | undefined;
+  onProgress?: ((event: IngestProgressEvent) => void) | undefined;
 }
 
 export interface IngestProgressEvent {
