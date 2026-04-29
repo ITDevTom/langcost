@@ -13,6 +13,8 @@
     "test:db": "bun test packages/db",
     "dev:api": "bun run --cwd apps/api dev",
     "dev:web": "bun run --cwd apps/web dev",
+    "release": "bun scripts/release.ts",
+    "release:dry-run": "bun scripts/release.ts --dry-run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "biome check .",
     "format": "biome format --write ."

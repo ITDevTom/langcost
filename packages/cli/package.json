@@ -3,13 +3,13 @@
   "version": "0.1.4",
   "type": "module",
   "bin": {
-    "langcost": "./src/index.ts"
+    "langcost": "src/index.ts"
   },
   "description": "Cost intelligence and fault attribution for AI agent systems",
   "license": "AGPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vjvkrm/langcost",
+    "url": "git+https://github.com/vjvkrm/langcost.git",
     "directory": "packages/cli"
   },
   "keywords": [
