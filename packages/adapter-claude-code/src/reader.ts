@@ -32,25 +32,29 @@ export async function readConversationFile(filePath: string): Promise<ReadConver
     }
   }
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      lastOffset += value.byteLength;
+      buffered += decoder.decode(value, { stream: true });
+
+      let newlineIndex = buffered.indexOf("\n");
+      while (newlineIndex >= 0) {
+        parseLine(buffered.slice(0, newlineIndex));
+        buffered = buffered.slice(newlineIndex + 1);
+        newlineIndex = buffered.indexOf("\n");
+      }
     }
 
-    lastOffset += value.byteLength;
-    buffered += decoder.decode(value, { stream: true });
-
-    let newlineIndex = buffered.indexOf("\n");
-    while (newlineIndex >= 0) {
-      parseLine(buffered.slice(0, newlineIndex));
-      buffered = buffered.slice(newlineIndex + 1);
-      newlineIndex = buffered.indexOf("\n");
-    }
+    buffered += decoder.decode();
+    parseLine(buffered);
+  } finally {
+    reader.releaseLock();
   }
-
-  buffered += decoder.decode();
-  parseLine(buffered);
 
   const lastLineHash = lastNonEmptyLine ? await sha256(lastNonEmptyLine) : undefined;
 
