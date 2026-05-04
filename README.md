@@ -69,10 +69,12 @@ Scanned 12 sessions
 # Install the CLI + the adapter for your agent framework
 npm install -g langcost @langcost/adapter-claude-code
 # or: npm install -g langcost @langcost/adapter-openclaw
+# or: npm install -g langcost @langcost/adapter-warp
 
 # Scan your sessions
 langcost scan --source claude-code
 # or: langcost scan --source openclaw
+# or: langcost scan --source warp
 
 # Open the dashboard
 langcost dashboard
@@ -115,6 +117,7 @@ LangCost uses a plugin architecture — adapters translate agent-specific data i
 |---------|---------|--------|---------------|
 | **Claude Code** | `@langcost/adapter-claude-code` | `~/.claude/projects/` | JSONL session logs from the Claude Code CLI |
 | **OpenClaw** | `@langcost/adapter-openclaw` | `~/.openclaw/` | JSONL session logs from OpenClaw agents |
+| **Warp** | `@langcost/adapter-warp` | `~/Library/Group Containers/.../warp.sqlite` | Oz agent sessions from Warp's local SQLite database |
 
 ```bash
 # Use multiple adapters — scan from different sources into the same DB

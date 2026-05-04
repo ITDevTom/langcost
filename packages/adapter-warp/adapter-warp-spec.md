@@ -1,6 +1,6 @@
 # Spec: `@langcost/adapter-warp`
 
-**Status:** Draft — v3 (updated after second investigation round)  
+**Status:** Implemented (v3 spec — all acceptance criteria met)  
 **Date:** 2026-05-04  
 **Author:** Amirault
 
