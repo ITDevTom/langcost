@@ -1,6 +1,6 @@
 # Spec: `@langcost/adapter-warp`
 
-**Status:** Draft  
+**Status:** Draft — v2 (updated after deeper investigation)  
 **Date:** 2026-05-04  
 **Author:** Amirault
 
@@ -45,7 +45,10 @@ Warp stores its AI session data in a private SQLite database:
 ~/Library/Group Containers/2BBY89MBSN.dev.warp/Library/Application Support/dev.warp.Warp-Stable/warp.sqlite
 ```
 
-Two tables are relevant:
+WAL mode is confirmed active (`warp.sqlite-wal` and `warp.sqlite-shm` files exist), so
+concurrent reads are safe while Warp is running.
+
+Three tables are relevant:
 
 ### `agent_conversations`
 
@@ -108,15 +111,18 @@ One row per exchange (a single user prompt → assistant response cycle).
 |---|---|---|
 | `exchange_id` | TEXT | UUID — primary identifier |
 | `conversation_id` | TEXT | FK → `agent_conversations.conversation_id` |
-| `start_ts` | DATETIME | Timestamp of the request |
-| `input` | TEXT | JSON array — the user query and rich context (see below) |
+| `start_ts` | DATETIME | Timestamp of the LLM request |
+| `input` | TEXT | JSON array — the full prompt: user query + all context (see below) |
 | `output_status` | TEXT | `"Completed"`, presumably also error states |
 | `model_id` | TEXT | Model ID (e.g., `"claude-4-6-sonnet-high"`) |
 | `planning_model_id` | TEXT | Usually empty |
 | `coding_model_id` | TEXT | Usually empty |
 | `working_directory` | TEXT | CWD at time of query |
 
-`input` JSON structure (observed):
+`input` contains the **entire prompt** sent to the LLM — user message text plus all injected
+context (project rules, directory state, git branch, terminal history). This makes it a reliable
+basis for input token estimation.
+
 ```json
 [
   {
@@ -133,17 +139,51 @@ One row per exchange (a single user prompt → assistant response cycle).
 ]
 ```
 
+### `blocks`
+
+One row per terminal command executed by the agent (`run_command` tool calls only).
+
+| Column | Type | Content |
+|---|---|---|
+| `block_id` | TEXT | Stable identifier, e.g. `"precmd-177790-32"` |
+| `start_ts` | DATETIME | When the command started |
+| `completed_ts` | DATETIME | When the command finished |
+| `exit_code` | INTEGER | `0` = success, non-zero = failure |
+| `stylized_command` | BLOB | The command that was run (ANSI-encoded) |
+| `stylized_output` | BLOB | The command's terminal output (ANSI-encoded) |
+| `ai_metadata` | TEXT | JSON with `requested_command_action_id` and `conversation_id` |
+
+`ai_metadata` structure (observed):
+```json
+{
+  "requested_command_action_id": "toolu_01JvUGJUnWPPx8ttS3VfsbQD",
+  "conversation_id": "4213546a-6805-42f4-bcdd-21989e851347",
+  "subagent_task_id": null
+}
+```
+
+Key findings:
+- `requested_command_action_id` is Claude's `tool_use.id` — this is the exact tool call identifier.
+- Each block can be attributed to its parent LLM exchange via timestamps: a block belongs to the
+  exchange with the largest `start_ts` that is still less than `block.start_ts` within the same
+  conversation. Verified empirically — blocks fall cleanly between consecutive exchanges.
+- **Coverage**: `blocks` only captures `run_command` tool calls. Tools like `read_files`, `grep`,
+  and `apply_file_diff` are not persisted. In a typical Warp session, `run_command` accounts for
+  the majority of tool calls (e.g., 13 run_command vs 3 read_files observed). Coverage varies by
+  workflow.
+
 ---
 
 ## Mapping to LangCost Types
 
-| LangCost Type | Warp Source |
-|---|---|
-| `Trace` | One per `agent_conversations` row |
-| `Span` (type=`llm`) | One per `ai_queries` row belonging to that conversation |
-| `Span` (type=`tool`) | **Cannot reconstruct** — only aggregate counts available |
-| `Message` (role=`user`) | Extracted from `ai_queries.input[0].Query.text` |
-| `Message` (role=`assistant`) | **Not stored** — Warp does not persist the AI response text |
+| LangCost Type | Warp Source | Notes |
+|---|---|---|
+| `Trace` | `agent_conversations` row | One per session |
+| `Span` (type=`llm`) | `ai_queries` row | One per exchange |
+| `Span` (type=`tool`) | `blocks` row with `ai_metadata` | `run_command` calls only |
+| `Message` (role=`user`) | `ai_queries.input[0].Query.text` | Full prompt text |
+| `Message` (role=`assistant`) | Not stored | Warp does not persist AI response text |
+| `Message` (role=`tool`) | `blocks.stylized_output` (ANSI-stripped) | Command output |
 
 ### Trace fields
 
@@ -153,142 +193,157 @@ One row per exchange (a single user prompt → assistant response cycle).
 | `externalId` | `conversation_id` |
 | `source` | `"warp"` |
 | `startedAt` | `MIN(ai_queries.start_ts)` for the conversation |
-| `endedAt` | `last_modified_at` (approximation) |
-| `totalInputTokens` | Sum of all `token_usage[*].byok_tokens + warp_tokens` (approximate — not split by input/output) |
-| `totalOutputTokens` | **Unknown** — not available separately |
-| `totalCostUsd` | Estimated via `calculateCost()` using aggregate tokens (BYOK) or `credits_spent` (Warp) |
-| `model` | Primary model from `token_usage` (highest token count) |
+| `endedAt` | `last_modified_at` |
+| `totalInputTokens` | Sum of `token_usage[*].byok_tokens + warp_tokens` (not split by input/output) |
+| `totalOutputTokens` | `0` — not separately available |
+| `totalCostUsd` | Estimated via `calculateCost()` on aggregate BYOK tokens, or `credits_spent` metadata for Warp-credit users |
+| `model` | Model with highest token count in `token_usage` |
 | `status` | `"complete"` if all exchanges succeeded, `"error"` if any failed |
 
 ### Span (LLM exchange) fields
 
 | Field | Source |
 |---|---|
-| `id` | `"warp:span:{exchange_id}"` |
+| `id` | `"warp:span:llm:{exchange_id}"` |
 | `externalId` | `exchange_id` |
 | `type` | `"llm"` |
 | `startedAt` | `start_ts` |
-| `model` | `model_id` (after normalization — see Blockers) |
-| `inputTokens` | **Not available** — must be estimated or omitted |
-| `outputTokens` | **Not available** — not stored |
-| `costUsd` | **Not available** per span — only per conversation |
+| `endedAt` | next exchange `start_ts` or `last_modified_at` (approximation) |
+| `model` | `model_id` (after normalization) |
+| `inputTokens` | Estimated — see token estimation strategy below |
+| `outputTokens` | Estimated — see token estimation strategy below |
+| `costUsd` | Estimated — see token estimation strategy below |
 | `status` | `"ok"` if `output_status = "Completed"`, else `"error"` |
+
+### Span (tool call) fields
+
+| Field | Source |
+|---|---|
+| `id` | `"warp:span:tool:{block_id}"` |
+| `externalId` | `requested_command_action_id` (Claude tool_use.id) |
+| `type` | `"tool"` |
+| `name` | `"run_command"` |
+| `parentSpanId` | Parent LLM span (attributed by timestamp) |
+| `startedAt` | `blocks.start_ts` |
+| `endedAt` | `blocks.completed_ts` |
+| `durationMs` | `completed_ts - start_ts` |
+| `toolInput` | ANSI-stripped `stylized_command` |
+| `toolOutput` | ANSI-stripped `stylized_output` |
+| `toolSuccess` | `exit_code === 0` |
+| `status` | `"ok"` or `"error"` based on `exit_code` |
+
+---
+
+## Token Estimation Strategy
+
+The critical blocker (no per-exchange token counts) is solvable via a two-signal approach that
+yields per-span estimates consistent with the conversation ground truth.
+
+**Signal 1 — Content-based estimation:**  
+`ai_queries.input` is the full prompt JSON (user text + all injected context). Applying
+`estimateTokenCount(JSON.stringify(input))` — already available in `@langcost/core` — gives a
+reasonable per-exchange input token estimate.
+
+**Signal 2 — Conversation-level normalization:**  
+`conversation_data.token_usage` provides the exact total token count per model per conversation.
+After estimating all exchanges, scale the estimates so they sum to the known total:
+
+```
+estimated[i]    = estimateTokenCount(JSON.stringify(exchange[i].input))
+total_estimated = sum(estimated)
+actual_total    = sum(token_usage[*].byok_tokens + warp_tokens)
+
+scaled_tokens[i] = estimated[i] × (actual_total / total_estimated)
+```
+
+The scaled estimate is proportionally honest: exchanges with larger prompts receive more tokens.
+All per-span estimates sum exactly to the conversation actual total. Cost is then computed via
+`calculateCost(model, scaled_tokens[i], 0)` (input-only, since output is unavailable).
+
+**Limitation:** Input and output tokens are not separable. All scaled tokens are treated as input
+for cost purposes, which over-estimates input cost and under-estimates output cost. The aggregate
+cost at trace level remains accurate.
 
 ---
 
 ## Blockers
 
-### Blocker 1 — No per-exchange token counts (CRITICAL)
+### Blocker 1 — No per-exchange token counts
 
-**Problem:** The `ai_queries` table has no `input_tokens` or `output_tokens` columns. Token data
-is only available as an aggregate at the conversation level in `agent_conversations.conversation_data`.
+**Status: Mitigated** via the two-signal estimation strategy above.
 
-**Impact:**
-- Cannot calculate cost per span (LLM exchange).
-- The `high_output` waste rule will not fire (requires per-span output token counts).
-- The `low_cache` rule will not work per-span (cache read/write tokens not tracked per exchange).
-- Per-span cost display in the trace explorer will be `$0` or estimated.
+Per-span token estimates are approximate but proportionally consistent and grounded in the
+conversation actual total. This is sufficient for `high_output` detection (flags spans whose
+scaled token count is 3× above the session average).
 
-**Options:**
-1. **Accept the limitation** — show cost at conversation (trace) level only; spans show `$0`.
-   Simplest, honest, but limits waste detection depth.
-2. **Estimate proportionally** — distribute conversation-level tokens across spans proportionally
-   by `input` JSON byte size. Rough approximation but allows per-span cost estimates.
-3. **Wait for Warp to expose this data** — file a feature request with Warp to add token counts
-   to `ai_queries`.
-
-**Recommended approach:** Option 1 for the initial implementation, document the limitation clearly.
-Option 2 can be added as a `--estimate-tokens` flag in a follow-up.
+The remaining gap: input/output split is unknown, so `low_cache` cannot fire per-span.
 
 ---
 
-### Blocker 2 — No output message content
+### Blocker 2 — No tool spans / no assistant message content
 
-**Problem:** Warp does not store the AI assistant's response text. Only the user's input query is
-available in `ai_queries.input`.
+**Status: Partially mitigated** via the `blocks` table.
 
-**Impact:**
-- Cannot reconstruct `Message` records for `role=assistant`.
-- The `high_output` rule (which flags spans with abnormally long responses) cannot analyze content.
-- Trace explorer will show user messages but no assistant messages.
+**Tool spans**: The `blocks` table provides exact data for all `run_command` tool calls:
+exact timing, exit code, command text, and command output. Parent exchange attribution via
+timestamp is clean and reliable.
 
-**Options:**
-1. **Accept the limitation** — only ingest `user` messages; skip `assistant` messages.
-2. **Read from Warp blocks table** — the `blocks` table might contain terminal output. Investigate
-   further.
+**Coverage gap**: Non-terminal tools (`read_files`, `grep`, `apply_file_diff`, etc.) are not
+persisted as blocks. These cannot be reconstructed. A session that is predominantly
+read-heavy will have incomplete tool span coverage.
 
-**Recommended approach:** Option 1 for the initial implementation.
+**Assistant messages**: Response text is still not stored. `Message` records for
+`role=assistant` remain unavailable.
 
 ---
 
 ### Blocker 3 — SQLite locking
 
-**Problem:** Warp keeps `warp.sqlite` open while the app is running. Direct reads may fail or
-return stale WAL data if Warp is holding an exclusive lock.
-
-**Impact:** `langcost scan` may fail or return incomplete data when Warp is open.
-
-**Mitigation:** Use SQLite WAL mode (which allows concurrent readers) and open the database
-read-only (`PRAGMA query_only = ON`). If the lock cannot be acquired, fail gracefully with a
-clear error message directing the user to quit Warp first.
-
-SQLite WAL mode is the default for many applications; Warp likely already uses it (evidenced by
-the presence of `warp.sqlite-wal` and `warp.sqlite-shm` files).
+**Status: Resolved.**  
+Warp uses WAL mode (confirmed by presence of `warp.sqlite-wal` / `warp.sqlite-shm`). Opening
+with `{ readonly: true }` in `bun:sqlite` works concurrently while Warp is running.
 
 ---
 
 ### Blocker 4 — Model ID mapping
 
-**Problem:** Warp uses its own model ID strings (e.g., `"claude-4-6-sonnet-high"`,
-`"Claude Sonnet 4.6"`, `"Claude Haiku 4.5"`) that differ from the pricing model IDs in
-`@langcost/core` (e.g., `"claude-sonnet-4-6"`, `"claude-haiku-4-5"`).
+**Status: Mitigated** via a static normalization map.
 
-**Impact:** `calculateCost()` will return `$0` for unknown model IDs.
+Two formats need mapping:
+- `ai_queries.model_id` (snake_case): `"claude-4-6-sonnet-high"` → `"claude-sonnet-4-6"`
+- `conversation_data.token_usage[].model_id` (display name): `"Claude Sonnet 4.6"` → `"claude-sonnet-4-6"`
 
-**Mitigation:** Add a Warp-specific model ID normalization map in the adapter:
-
+Known mappings:
 ```
 "claude-4-6-sonnet-high" → "claude-sonnet-4-6"
+"claude-4-6-haiku"       → "claude-haiku-4-5"
 "Claude Sonnet 4.6"      → "claude-sonnet-4-6"
 "Claude Haiku 4.5"       → "claude-haiku-4-5"
-"claude-4-6-haiku"       → "claude-haiku-4-5"
 ```
 
-This map must be maintained as Warp adds new model options. The `model_id` field in `ai_queries`
-(snake_case, e.g., `"claude-4-6-sonnet-high"`) and the `model_id` in `conversation_data.token_usage`
-(display name, e.g., `"Claude Sonnet 4.6"`) are different formats — both need mapping.
+This map must be maintained as Warp adds new models. Unknown IDs cost `$0` but token counts
+and waste detection still work.
 
 ---
 
 ### Blocker 5 — Private, undocumented database schema
 
-**Problem:** `warp.sqlite` is a private implementation detail of Warp. The schema is not publicly
-documented and can change at any time without notice. A schema migration in Warp could silently
-break the adapter.
+**Status: Mitigated** via defensive coding.
 
-**Impact:** Maintenance burden. Breaking changes could go undetected until users report errors.
-
-**Mitigation:**
-- Add schema version detection: read `__diesel_schema_migrations` to verify expected tables exist.
-- Add defensive JSON parsing — use optional chaining everywhere; never throw on unexpected shape.
-- Test against multiple Warp versions in CI if possible.
-- Document the risk in the adapter README.
+- Validate expected tables exist by querying `__diesel_schema_migrations` at startup.
+- Use optional chaining throughout — never throw on unexpected JSON shapes.
+- Emit a clear warning (not a crash) when the schema version is unrecognized.
+- Document the stability risk in the adapter README.
 
 ---
 
 ### Blocker 6 — BYOK vs Warp tokens
 
-**Problem:** The `token_usage` in `conversation_data` splits tokens into `warp_tokens` (billed by
-Warp, consumed as credits) and `byok_tokens` (billed via the user's own API key). The `credits_spent`
-field is always `0.0` for BYOK users; Warp does not record the actual monetary cost for BYOK usage.
+**Status: Mitigated.**
 
-**Impact:** For BYOK users, `totalCostUsd` must be estimated via `calculateCost()` using
-`byok_tokens`. For Warp-credit users, the `credits_spent` field could be used but does not
-directly map to USD.
-
-**Recommended approach:** For BYOK users, estimate cost via `calculateCost(model, tokens, 0)` on
-the aggregate token sum (treating all as input since input/output split is unavailable). For
-Warp-credit users, store `credits_spent` in metadata and flag that cost is in credits, not USD.
+- BYOK users: estimate cost via `calculateCost(model, byok_tokens, 0)`.
+- Warp-credit users: `credits_spent` does not map to USD — store it in `metadata` and clearly
+  label it as credits, not dollars, in the adapter output.
 
 ---
 
@@ -304,12 +359,15 @@ packages/adapter-warp/
 ├── src/
 │   ├── index.ts          # exports warpAdapter as default
 │   ├── adapter.ts        # implements IAdapter<Db>
-│   ├── discovery.ts      # locates warp.sqlite
-│   ├── reader.ts         # opens SQLite (read-only), queries tables
-│   ├── normalizer.ts     # maps Warp rows → Trace, Span[], Message[]
+│   ├── discovery.ts      # locates warp.sqlite, validates schema
+│   ├── reader.ts         # opens SQLite (read-only), runs queries
+│   ├── normalizer.ts     # maps rows → Trace, Span[], Message[]
+│   ├── token-estimator.ts  # two-signal token estimation logic
+│   ├── model-map.ts      # Warp model ID → langcost pricing ID
 │   └── types.ts          # TypeScript types for Warp's JSON shapes
 └── test/
     ├── normalizer.test.ts
+    ├── token-estimator.test.ts
     └── discovery.test.ts
 ```
 
@@ -324,95 +382,113 @@ Can be overridden via `--path`.
 
 ### Read strategy
 
-The adapter uses Bun's native SQLite (`bun:sqlite`) to open the Warp database in read-only mode:
+Warp uses WAL mode; open read-only:
 
 ```typescript
 const db = new Database(warpDbPath, { readonly: true });
 ```
 
-Queries:
+Three queries per ingest run:
 
 ```sql
--- All conversations modified within --since window
+-- 1. Conversations modified within --since window
 SELECT conversation_id, conversation_data, last_modified_at
 FROM agent_conversations
 WHERE last_modified_at >= ?
 ORDER BY last_modified_at ASC;
 
--- All exchanges for discovered conversations
+-- 2. All exchanges for those conversations
 SELECT exchange_id, conversation_id, start_ts, input, output_status, model_id, working_directory
 FROM ai_queries
 WHERE conversation_id IN (...)
+ORDER BY start_ts ASC;
+
+-- 3. All run_command tool calls for those conversations
+SELECT block_id, start_ts, completed_ts, exit_code,
+       stylized_command, stylized_output, ai_metadata
+FROM blocks
+WHERE json_extract(ai_metadata, '$.conversation_id') IN (...)
+  AND ai_metadata IS NOT NULL AND ai_metadata != ''
 ORDER BY start_ts ASC;
 ```
 
 ### Normalizer
 
-Each `agent_conversations` row becomes one `Trace`.
-Each `ai_queries` row becomes one `Span` of type `llm`.
-User query text from `ai_queries.input` becomes one `Message` of role `user`.
+1. Each `agent_conversations` row → one `Trace`.
+2. Each `ai_queries` row → one `Span` of type `llm`.
+3. Run token estimation across all llm spans for the conversation (two-signal approach).
+4. Each `blocks` row with `ai_metadata` → one `Span` of type `tool`, attributed to its parent
+   llm span by finding the exchange with the highest `start_ts < block.start_ts`.
+5. `ai_queries.input[0].Query.text` → `Message` of role `user` on the llm span.
+6. ANSI-stripped `blocks.stylized_output` → `Message` of role `tool` on the tool span.
 
-Token and cost data at the trace level comes from `conversation_data.conversation_usage_metadata`.
-Span-level tokens default to `null` (see Blocker 1).
+### ANSI stripping
+
+`stylized_command` and `stylized_output` are ANSI-encoded terminal output. Strip escape sequences
+before storing as `toolInput` / `toolOutput`. A simple regex over the known ANSI CSI sequences
+is sufficient — the goal is readable text, not perfect fidelity.
 
 ### Incremental ingestion
 
-Unlike the file-based adapters, Warp's source is a SQLite DB with no file-size or hash to compare.
-Use `last_modified_at` from `agent_conversations` and the `updatedAt` from the `ingestion_state`
-repository to skip conversations that have not changed since last scan.
+Warp's source has no file hash or byte offset to compare. Use `last_modified_at` from
+`agent_conversations` against the `updatedAt` in `ingestion_state` to skip unchanged conversations.
+
+---
+
+## Waste Rule Compatibility
+
+| Rule | v1 Assessment | v2 Assessment | Notes |
+|---|---|---|---|
+| `model_overuse` | ✅ | ✅ | Per-exchange model ID available |
+| `retry_patterns` | ✅ | ✅ | Failed `output_status` across consecutive exchanges |
+| `tool_failures` | ⚠️ partial | ✅ | `blocks.exit_code` gives exact per-call failure |
+| `agent_loops` | ❌ | ✅ | Repeated `run_command` blocks attributed to same exchange pattern |
+| `high_output` | ❌ | ⚠️ approximate | Scaled token estimates enable detection; input/output split unknown |
+| `low_cache` | ❌ | ❌ | Cache hit/miss not exposed per exchange |
 
 ---
 
 ## Acceptance Criteria
 
-1. `langcost scan --source warp` successfully reads `warp.sqlite` and ingests conversations as traces.
-2. Each `ai_queries` row is ingested as an `llm` span within its parent trace.
-3. User query text is ingested as a `user` message attached to the span.
-4. `model_id` values are normalized to known pricing model IDs where possible.
-5. Token counts are available at the trace level (from `conversation_usage_metadata`).
-6. Span-level token counts are `null` (with a clear note in the README that per-exchange tokens are unavailable).
-7. `langcost validate --source warp` correctly detects whether `warp.sqlite` exists and is readable.
-8. If `warp.sqlite` is locked or inaccessible, the adapter fails with a human-readable message (not a crash).
-9. Incremental scans skip conversations not modified since the last scan.
-10. The adapter works on macOS (primary target). Linux/Windows support is out of scope (Warp is macOS-only for now).
-11. All waste detection rules that are compatible with the available data work correctly:
-    - `tool_failures`: partially — only detects if `output_status` ≠ "Completed", not individual tool call failures.
-    - `agent_loops`: does not fire (requires per-span tool call data).
-    - `retry_patterns`: fires on multiple consecutive exchanges where `output_status` indicates failure.
-    - `high_output`: does not fire (no per-span output token counts).
-    - `low_cache`: does not fire (no cache token data per span).
-    - `model_overuse`: fires if 100% of exchanges use an expensive model.
+1. `langcost scan --source warp` reads `warp.sqlite` and ingests conversations as traces.
+2. Each `ai_queries` row is ingested as an `llm` span.
+3. Each `blocks` row with `ai_metadata` is ingested as a `tool` span, parented to the correct
+   llm span via timestamp attribution.
+4. Per-span token counts are estimated (two-signal: content estimation + conversation normalization)
+   and documented as estimates in the adapter README.
+5. `model_id` values are normalized to known pricing model IDs where possible.
+6. `tool_failures` fires on individual failed blocks (non-zero `exit_code`).
+7. `agent_loops` fires when the same command pattern repeats across exchanges.
+8. `model_overuse` and `retry_patterns` fire as in other adapters.
+9. `langcost validate --source warp` reports whether `warp.sqlite` exists and is readable,
+   including a schema version check.
+10. Failures (locked DB, missing tables, malformed JSON) produce human-readable errors, not crashes.
+11. Incremental scans skip conversations with `last_modified_at ≤ ingestion_state.updatedAt`.
+12. The adapter works on macOS. Linux/Windows are out of scope.
 
 ---
 
 ## Out of Scope
 
-- Reconstructing assistant response content (not stored by Warp).
-- Per-span token counts (not available in current Warp schema).
-- Individual tool call span reconstruction (only aggregate counts available).
+- Reconstructing assistant response text (not stored by Warp).
+- Tool spans for `read_files`, `grep`, `apply_file_diff`, and other non-terminal tools.
+- Accurate input/output token split (all tokens treated as input for cost estimation).
 - Windows and Linux support (Warp is macOS-only currently).
-- Warp Preview channel support (different bundle ID; can be added later with `--channel` flag).
+- Warp Preview channel (different bundle ID; can be added later with a `--channel` flag).
 
 ---
 
 ## Open Questions
 
-1. **Does Warp use WAL mode?** If not, concurrent reads while Warp is running may silently
-   return incomplete data. Need to verify with `PRAGMA journal_mode`.
+1. **What does `output_status` look like for failed exchanges?** Only `"Completed"` has been
+   observed. The error value(s) determine how `status = "error"` is set on llm spans.
 
-2. **Can `blocks` table be used for assistant output?** The `blocks` table exists in the schema.
-   Investigation needed to determine if it contains AI response text that could be used to
-   populate `assistant` messages.
+2. **Warp Stable vs Preview?** Warp Preview uses bundle ID `dev.warp.Warp-Preview`. Should the
+   adapter auto-detect both databases or require a `--channel` flag?
 
-3. **What does `output_status` look like for failed exchanges?** Only `"Completed"` has been
-   observed. Understanding the error values is needed to correctly set span `status = "error"`.
-
-4. **Warp Stable vs Preview?** Warp Preview uses bundle ID `dev.warp.Warp-Preview`. Should the
-   adapter support both by default or require a flag?
-
-5. **Token category breakdown:** The `byok_token_usage_by_category` field contains categories
-   like `"primary_agent"`, `"full_terminal_use"`. Could these be used to split input/output
-   tokens at the trace level? Would need Warp to clarify the semantics.
+3. **Token category semantics:** The `byok_token_usage_by_category` categories (`"primary_agent"`,
+   `"full_terminal_use"`) may distinguish model roles or usage contexts. If Warp clarifies the
+   semantics, these could improve input/output token attribution.
 
 ---
 
