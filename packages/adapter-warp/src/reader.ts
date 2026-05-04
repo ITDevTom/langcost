@@ -6,7 +6,7 @@ export function readWarpData(dbPath: string, since?: Date): WarpReadResult {
   const db = new Database(dbPath, { readonly: true });
 
   try {
-    const sinceStr = since ? since.toISOString().replace("T", " ").replace("Z", "") : "1970-01-01";
+    const sinceStr = since ? since.toISOString().slice(0, 19).replace("T", " ") : "1970-01-01";
 
     const conversations = db
       .query<WarpConversationRow, [string]>(
@@ -35,7 +35,9 @@ export function readWarpData(dbPath: string, since?: Date): WarpReadResult {
 
     const blocks = db
       .query<WarpBlockRow, string[]>(
-        `SELECT block_id, start_ts, completed_ts, exit_code,
+        `SELECT block_id,
+                json_extract(ai_metadata, '$.conversation_id') as conversation_id,
+                start_ts, completed_ts, exit_code,
                 stylized_command, stylized_output, ai_metadata
          FROM blocks
          WHERE json_extract(ai_metadata, '$.conversation_id') IN (${placeholders})

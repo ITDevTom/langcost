@@ -3,6 +3,7 @@ import { estimateTokenCount } from "@langcost/core";
 import type { WarpConversationUsageMetadata, WarpQueryRow } from "./types";
 
 const PRIMARY_AGENT_CATEGORY = "primary_agent";
+const INPUT_TOKEN_RATIO = 0.8;
 
 export interface SpanTokenEstimate {
   exchangeId: string;
@@ -52,9 +53,7 @@ export function estimateSpanTokens(
 
   return rawEstimates.map(({ exchangeId, raw }) => {
     const scaled = Math.round(raw * scale);
-    // Split 80/20 input/output as a rough approximation.
-    // In agentic sessions, input (cumulative context) dominates output.
-    const inputTokens = Math.round(scaled * 0.8);
+    const inputTokens = Math.round(scaled * INPUT_TOKEN_RATIO);
     const outputTokens = scaled - inputTokens;
     return { exchangeId, inputTokens, outputTokens };
   });

@@ -19,17 +19,26 @@ export interface NormalizedConversation {
   messages: MessageRecord[];
 }
 
-// ── ANSI stripping ──
-
-const ANSI_CSI = /\x1b\[[0-9;]*m/g;
+function stripAnsiEscapes(text: string): string {
+  let result = "";
+  let i = 0;
+  while (i < text.length) {
+    if (text.charCodeAt(i) === 0x1b && text[i + 1] === "[") {
+      i += 2;
+      while (i < text.length && text[i] !== "m") i++;
+      i++;
+    } else {
+      result += text[i];
+      i++;
+    }
+  }
+  return result;
+}
 
 function stripAnsi(bytes: Uint8Array | null): string {
   if (!bytes || bytes.length === 0) return "";
-  return new TextDecoder().decode(bytes).replace(ANSI_CSI, "");
+  return stripAnsiEscapes(new TextDecoder().decode(bytes));
 }
-
-// ── output_status parsing ──
-// Values are stored as JSON-quoted strings: '"Completed"', '"Cancelled"', '"Failed"'
 
 function parseOutputStatus(raw: string): "ok" | "error" | "partial" {
   let value = raw;
@@ -37,17 +46,16 @@ function parseOutputStatus(raw: string): "ok" | "error" | "partial" {
     const parsed = JSON.parse(raw);
     if (typeof parsed === "string") value = parsed;
   } catch {}
-
   if (value === "Completed") return "ok";
   if (value === "Failed") return "error";
-  return "partial"; // Cancelled or unknown
+  return "partial";
 }
-
-// ── Timestamp parsing ──
 
 function parseTs(value: string | null | undefined): Date | undefined {
   if (!value) return undefined;
-  const ms = Date.parse(value.replace(" ", "T") + (value.includes("Z") ? "" : "Z"));
+  const withT = value.includes("T") ? value : value.replace(" ", "T");
+  const withZ = withT.endsWith("Z") ? withT : `${withT}Z`;
+  const ms = Date.parse(withZ);
   return Number.isNaN(ms) ? undefined : new Date(ms);
 }
 
@@ -126,7 +134,6 @@ export function normalizeConversation(
   const spans: SpanRecord[] = [];
   const messages: MessageRecord[] = [];
 
-  // Parse conversation metadata
   let convData: WarpConversationData = {};
   try {
     convData = JSON.parse(conv.conversation_data) as WarpConversationData;
@@ -141,17 +148,14 @@ export function normalizeConversation(
     ? calculateCost(normalizeModelId(dominantModel), totalTokens, 0).totalCost
     : 0;
 
-  // Estimate per-span tokens (primary_agent only, normalized)
   const tokenEstimates = estimateSpanTokens(exchanges, usageMeta);
   const tokenEstimateMap = new Map(tokenEstimates.map((e) => [e.exchangeId, e]));
 
-  // Build exchange timestamps for block attribution
   const exchangeTimestamps = exchanges.map((ex) => ({
     exchangeId: ex.exchange_id,
     startMs: parseTs(ex.start_ts)?.getTime() ?? 0,
   }));
 
-  // Track per-span message position counters
   const positionCounter = new Map<string, number>();
   const nextPosition = (spanId: string): number => {
     const pos = positionCounter.get(spanId) ?? 0;
@@ -162,7 +166,6 @@ export function normalizeConversation(
   let hasError = false;
   let hasPartial = false;
 
-  // ── LLM spans ──
   for (const ex of exchanges) {
     const spanId = llmSpanId(conv.conversation_id, ex.exchange_id);
     const startedAt = parseTs(ex.start_ts) ?? new Date(conv.last_modified_at);
@@ -204,23 +207,22 @@ export function normalizeConversation(
       },
     });
 
-    // User message from input text
     const userText = extractUserText(ex.input);
     if (userText.length > 0) {
+      const pos = nextPosition(spanId);
       messages.push({
-        id: messageId(spanId, nextPosition(spanId)),
+        id: messageId(spanId, pos),
         spanId,
         traceId: tid,
         role: "user",
         content: userText,
         tokenCount: estimateTokenCount(userText),
-        position: positionCounter.get(spanId)! - 1,
+        position: pos,
         metadata: null,
       });
     }
   }
 
-  // ── Tool spans (run_command blocks) ──
   for (const block of blocks) {
     let blockMeta: WarpBlockMetadata = {};
     try {
@@ -278,22 +280,21 @@ export function normalizeConversation(
 
     if (!success) hasError = true;
 
-    // Tool result message
     if (outputText.length > 0) {
+      const pos = nextPosition(spanId);
       messages.push({
-        id: messageId(spanId, nextPosition(spanId)),
+        id: messageId(spanId, pos),
         spanId,
         traceId: tid,
         role: "tool",
         content: outputText,
         tokenCount: estimateTokenCount(outputText),
-        position: positionCounter.get(spanId)! - 1,
+        position: pos,
         metadata: { exitCode: block.exit_code },
       });
     }
   }
 
-  // ── Trace ──
   const startedAt =
     parseTs(exchanges[0]?.start_ts) ?? parseTs(conv.last_modified_at) ?? new Date();
   const endedAt = parseTs(conv.last_modified_at) ?? startedAt;

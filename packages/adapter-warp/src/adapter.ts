@@ -73,7 +73,6 @@ export const warpAdapter: IAdapter<Db> = {
       total: rawData.conversations.length,
     });
 
-    // Group queries and blocks by conversation_id
     const queriesByConv = new Map<string, typeof rawData.queries>();
     for (const q of rawData.queries) {
       const list = queriesByConv.get(q.conversation_id) ?? [];
@@ -83,14 +82,9 @@ export const warpAdapter: IAdapter<Db> = {
 
     const blocksByConv = new Map<string, typeof rawData.blocks>();
     for (const b of rawData.blocks) {
-      let convId: string | undefined;
-      try {
-        convId = (JSON.parse(b.ai_metadata) as { conversation_id?: string }).conversation_id;
-      } catch {}
-      if (!convId) continue;
-      const list = blocksByConv.get(convId) ?? [];
+      const list = blocksByConv.get(b.conversation_id) ?? [];
       list.push(b);
-      blocksByConv.set(convId, list);
+      blocksByConv.set(b.conversation_id, list);
     }
 
     let tracesIngested = 0;
@@ -102,7 +96,6 @@ export const warpAdapter: IAdapter<Db> = {
     for (const [index, conv] of rawData.conversations.entries()) {
       const stateKey = `warp:${conv.conversation_id}`;
 
-      // Skip if not modified since last ingest
       if (!options?.force) {
         const existing = ingestionRepo.getBySourcePath(stateKey);
         const convModifiedAt = new Date(conv.last_modified_at).getTime();

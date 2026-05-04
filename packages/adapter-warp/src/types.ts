@@ -20,6 +20,7 @@ export interface WarpQueryRow {
 
 export interface WarpBlockRow {
   block_id: string;
+  conversation_id: string;
   start_ts: string; // DATETIME as string
   completed_ts: string | null;
   exit_code: number;
