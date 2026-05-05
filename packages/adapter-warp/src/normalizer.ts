@@ -1,4 +1,4 @@
-import { calculateCost, estimateTokenCount } from "@langcost/core";
+import { calculateCost, estimateTokenCount, findPricing } from "@langcost/core";
 import type { MessageRecord, SpanRecord, TraceRecord } from "@langcost/db";
 
 import { normalizeModelId } from "./model-map";
@@ -175,6 +175,7 @@ export function normalizeConversation(
     const inputTokens = tokens?.inputTokens ?? 0;
     const outputTokens = tokens?.outputTokens ?? 0;
     const costUsd = calculateCost(model, inputTokens, outputTokens).totalCost;
+    const provider = findPricing(model)?.provider ?? null;
 
     if (status === "error") hasError = true;
     if (status === "partial") hasPartial = true;
@@ -190,7 +191,7 @@ export function normalizeConversation(
       endedAt: startedAt,
       durationMs: null,
       model,
-      provider: "anthropic",
+      provider,
       inputTokens,
       outputTokens,
       costUsd,

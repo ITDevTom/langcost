@@ -184,11 +184,33 @@ describe("normalizeConversation", () => {
       expect(llm?.model).toBe("claude-sonnet-4-6");
     });
 
-    it("sets provider to anthropic", () => {
+    it("sets provider to anthropic for a Claude model", () => {
       const { spans } = normalizeConversation(aConversation(), [anExchange()], []);
       const llm = spans.find((s) => s.type === "llm");
 
       expect(llm?.provider).toBe("anthropic");
+    });
+
+    it("sets provider to openai for a GPT model", () => {
+      const { spans } = normalizeConversation(
+        aConversation(),
+        [anExchange({ model_id: "gpt-4.1" })],
+        [],
+      );
+      const llm = spans.find((s) => s.type === "llm");
+
+      expect(llm?.provider).toBe("openai");
+    });
+
+    it("sets provider to null for an unrecognised model", () => {
+      const { spans } = normalizeConversation(
+        aConversation(),
+        [anExchange({ model_id: "some-unknown-model" })],
+        [],
+      );
+      const llm = spans.find((s) => s.type === "llm");
+
+      expect(llm?.provider).toBeNull();
     });
 
     it("marks span ok for Completed — JSON-quoted value", () => {
