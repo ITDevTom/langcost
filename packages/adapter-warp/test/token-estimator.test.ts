@@ -153,16 +153,14 @@ describe("estimateSpanTokens", () => {
   });
 
   describe("input / output split", () => {
-    it("input tokens are 80% of scaled total (agentic sessions are input-heavy)", () => {
+    it("all scaled tokens go to inputTokens; outputTokens is 0 (output split unavailable)", () => {
       const result = estimateSpanTokens(
         [anExchange("ex-1", 100)],
         withPrimaryAgentTokens(1000),
       );
 
-      const total = (result[0]?.inputTokens ?? 0) + (result[0]?.outputTokens ?? 0);
-      const inputRatio = (result[0]?.inputTokens ?? 0) / total;
-
-      expect(inputRatio).toBeCloseTo(0.8, 1);
+      expect(result[0]?.outputTokens).toBe(0);
+      expect(result[0]?.inputTokens).toBe(1000);
     });
   });
 
