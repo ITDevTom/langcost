@@ -389,6 +389,30 @@ describe("normalizeConversation", () => {
       expect(toolSpan?.parentSpanId).toBeNull();
     });
 
+    it("truncates stylized_output exceeding 64KB to prevent DB bloat", () => {
+      const bigOutput = new Uint8Array(100_000).fill("x".charCodeAt(0));
+      const { spans } = normalizeConversation(
+        aConversation(),
+        [anExchange()],
+        [aBlock({ stylized_output: bigOutput })],
+      );
+      const tool = spans.find((s) => s.type === "tool");
+
+      expect((tool?.toolOutput?.length ?? 0)).toBeLessThanOrEqual(65_536);
+    });
+
+    it("strips OSC escape sequences from toolOutput", () => {
+      const osc = "\x1b]0;window title\x07On branch main";
+      const { spans } = normalizeConversation(
+        aConversation(),
+        [anExchange()],
+        [aBlock({ stylized_output: new TextEncoder().encode(osc) })],
+      );
+      const tool = spans.find((s) => s.type === "tool");
+
+      expect(tool?.toolOutput).toBe("On branch main");
+    });
+
     it("sets name to run_command", () => {
       const { spans } = normalizeConversation(aConversation(), [anExchange()], [aBlock()]);
       const tool = spans.find((s) => s.type === "tool");

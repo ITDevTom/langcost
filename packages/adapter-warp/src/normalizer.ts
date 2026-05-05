@@ -19,17 +19,42 @@ export interface NormalizedConversation {
   messages: MessageRecord[];
 }
 
+// Blobs larger than this are truncated before ANSI stripping to prevent DB bloat
+// (e.g. `cat big.log` tool calls).
+const ANSI_BLOB_CAP_BYTES = 65_536;
+
 function stripAnsiEscapes(text: string): string {
   let result = "";
   let i = 0;
   while (i < text.length) {
-    if (text.charCodeAt(i) === 0x1b && text[i + 1] === "[") {
+    if (text.charCodeAt(i) !== 0x1b) {
+      result += text[i++];
+      continue;
+    }
+    const next = text[i + 1];
+    if (next === "[") {
+      // CSI — skip parameter/intermediate bytes, then the final byte (0x40–0x7E)
       i += 2;
-      while (i < text.length && text[i] !== "m") i++;
+      while (i < text.length && (text.charCodeAt(i) < 0x40 || text.charCodeAt(i) > 0x7e)) i++;
       i++;
+    } else if (next === "]") {
+      // OSC — skip until BEL (0x07) or ST (ESC \)
+      i += 2;
+      while (i < text.length) {
+        if (text.charCodeAt(i) === 0x07) { i++; break; }
+        if (text.charCodeAt(i) === 0x1b && text[i + 1] === "\\") { i += 2; break; }
+        i++;
+      }
+    } else if (next === "P" || next === "^" || next === "_") {
+      // DCS / PM / APC — skip until ST (ESC \)
+      i += 2;
+      while (i < text.length) {
+        if (text.charCodeAt(i) === 0x1b && text[i + 1] === "\\") { i += 2; break; }
+        i++;
+      }
     } else {
-      result += text[i];
-      i++;
+      // All other two-char escapes (ESC M, ESC 7, ESC 8, etc.)
+      i += 2;
     }
   }
   return result;
@@ -37,7 +62,8 @@ function stripAnsiEscapes(text: string): string {
 
 function stripAnsi(bytes: Uint8Array | null): string {
   if (!bytes || bytes.length === 0) return "";
-  return stripAnsiEscapes(new TextDecoder().decode(bytes));
+  const capped = bytes.length > ANSI_BLOB_CAP_BYTES ? bytes.subarray(0, ANSI_BLOB_CAP_BYTES) : bytes;
+  return stripAnsiEscapes(new TextDecoder().decode(capped));
 }
 
 function parseOutputStatus(raw: string): "ok" | "error" | "partial" {

@@ -6,6 +6,9 @@ export function readWarpData(dbPath: string, since?: Date): WarpReadResult {
   const db = new Database(dbPath, { readonly: true });
 
   try {
+    // The >= comparison works because Warp stores DATETIME as "YYYY-MM-DD HH:MM:SS", which
+    // sorts correctly as a lexicographic string. If Warp ever changes the format, this would
+    // silently stop filtering correctly.
     const sinceStr = since ? since.toISOString().slice(0, 19).replace("T", " ") : "1970-01-01";
 
     const conversations = db
