@@ -76,8 +76,8 @@ Estimates sum to the exact conversation total and are proportionally accurate, b
 `credits_spent × effectiveCreditRateUsd`
 
 `effectiveCreditRateUsd` is selected via `--warp-plan`:
-- `build`: $18 / 1500 credits = $0.0120 per credit
-- `business`: $45 / 1500 credits = $0.0300 per credit
+- `build`: $20 / 1500 credits = $0.0133 per credit
+- `business`: $50 / 1500 credits = $0.0333 per credit
 - `add-on-low`: $0.0153 per credit (high-volume add-on tier)
 - `add-on-high`: $0.0250 per credit (base add-on tier)
 - `byok`: $0 (operational mode for API-direct sessions)

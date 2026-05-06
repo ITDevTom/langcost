@@ -284,8 +284,8 @@ describe("langcost", () => {
     getSqliteClient(db).close(false);
 
     expect(trace?.source).toBe("warp");
-    expect(trace?.metadata?.effectiveCreditRateUsd).toBe(0.03);
-    expect(trace?.metadata?.creditCostUsd).toBeCloseTo(0.03, 8);
+    expect(trace?.metadata?.effectiveCreditRateUsd).toBe(50 / 1500);
+    expect(trace?.metadata?.creditCostUsd).toBeCloseTo(50 / 1500, 8);
     expect(trace?.metadata?.apiCostUsd).toBeCloseTo(0.009, 8);
 
     const reportRuntime = createBufferRuntime();

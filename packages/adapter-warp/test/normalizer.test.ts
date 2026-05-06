@@ -211,10 +211,10 @@ describe("normalizeConversation", () => {
         [],
       );
 
-      expect(trace.totalCostUsd).toBeCloseTo(0.012, 8);
-      expect(trace.metadata?.creditCostUsd).toBeCloseTo(0.012, 8);
+      expect(trace.totalCostUsd).toBeCloseTo(20 / 1500, 8);
+      expect(trace.metadata?.creditCostUsd).toBeCloseTo(20 / 1500, 8);
       expect(trace.metadata?.apiCostUsd).toBeCloseTo(0.003, 8);
-      expect(trace.metadata?.costMarkupPct).toBeCloseTo(300, 8);
+      expect(trace.metadata?.costMarkupPct).toBeCloseTo(344.44444444, 8);
       expect(trace.metadata?.billingMode).toBe("credit");
     });
 
@@ -260,11 +260,11 @@ describe("normalizeConversation", () => {
         { warpPlan: "business" },
       );
 
-      expect(trace.metadata?.effectiveCreditRateUsd).toBeCloseTo(0.03, 8);
-      expect(trace.metadata?.creditCostUsd).toBeCloseTo(0.03, 8);
+      expect(trace.metadata?.effectiveCreditRateUsd).toBeCloseTo(50 / 1500, 8);
+      expect(trace.metadata?.creditCostUsd).toBeCloseTo(50 / 1500, 8);
       expect(trace.metadata?.apiCostUsd).toBeCloseTo(0.009, 8);
-      expect(trace.totalCostUsd).toBeCloseTo(0.036, 8);
-      expect(trace.metadata?.costMarkupPct).toBeCloseTo(300, 8);
+      expect(trace.totalCostUsd).toBeCloseTo(0.03933333333333333, 8);
+      expect(trace.metadata?.costMarkupPct).toBeCloseTo(337.037037037037, 8);
       expect(trace.metadata?.billingMode).toBe("mixed");
     });
   });
