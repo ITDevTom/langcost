@@ -8,9 +8,11 @@ export function createScanRoute(options: { dbPath?: string } = {}) {
   route.post("/", async (c) => {
     const body = await c.req.json().catch(() => ({}));
     const force = body && typeof body.force === "boolean" ? body.force : false;
+    const source =
+      body && typeof body.source === "string" && body.source.length > 0 ? body.source : undefined;
 
     try {
-      const result = await runConfiguredScan(options.dbPath, force);
+      const result = await runConfiguredScan(options.dbPath, force, source);
       return c.json(result);
     } catch (error) {
       return c.json(

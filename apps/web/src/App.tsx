@@ -194,9 +194,10 @@ export default function App() {
     setBanner(null);
 
     try {
-      const result = await triggerScan(false);
+      const result = await triggerScan(false, activeSource);
       await reloadShell();
-      setBanner(`Refresh complete. Ingested ${result.tracesIngested} traces.`);
+      const sourceLabel = activeSource ? ` from ${activeSource}` : "";
+      setBanner(`Refresh complete. Ingested ${result.tracesIngested} new traces${sourceLabel}.`);
       setBannerTone("info");
     } catch (cause) {
       setBanner(cause instanceof Error ? cause.message : "Refresh failed.");
@@ -243,7 +244,12 @@ export default function App() {
       />
 
       <main className="page-shell">
-        {banner ? (
+        {refreshing ? (
+          <div className="banner banner--info flex items-center gap-3">
+            <span className="spinner" aria-hidden="true" />
+            <span>Scanning {activeSource ?? "configured source"} for new traces…</span>
+          </div>
+        ) : banner ? (
           <div className={`banner ${bannerTone === "error" ? "banner--error" : "banner--info"}`}>
             {banner}
           </div>

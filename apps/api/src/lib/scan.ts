@@ -26,16 +26,25 @@ function toAdapterOptions(sourceConfig: SourceSettings & { source: string }, for
   };
 }
 
-function requireSourceConfig(settings: SourceSettings | null): SourceSettings & { source: string } {
-  if (!settings?.source) {
+function requireSourceConfig(
+  settings: SourceSettings | null,
+  sourceOverride?: string,
+): SourceSettings & { source: string } {
+  const source = sourceOverride ?? settings?.source;
+  if (!source) {
     throw new Error("No source configured. Save settings before triggering a scan.");
   }
 
+  // Only carry stored credentials when the override matches the saved source,
+  // otherwise the adapter will use its own defaults (e.g. claude-code falls
+  // back to ~/.claude/projects).
+  const useStoredCreds = !sourceOverride || sourceOverride === settings?.source;
+
   return {
-    source: settings.source,
-    ...(settings.sourcePath ? { sourcePath: settings.sourcePath } : {}),
-    ...(settings.apiKey ? { apiKey: settings.apiKey } : {}),
-    ...(settings.apiUrl ? { apiUrl: settings.apiUrl } : {}),
+    source,
+    ...(useStoredCreds && settings?.sourcePath ? { sourcePath: settings.sourcePath } : {}),
+    ...(useStoredCreds && settings?.apiKey ? { apiKey: settings.apiKey } : {}),
+    ...(useStoredCreds && settings?.apiUrl ? { apiUrl: settings.apiUrl } : {}),
   };
 }
 
@@ -54,10 +63,14 @@ function pruneToTraceLimit(db: Db, limit: number): void {
 export async function runConfiguredScan(
   dbPath?: string,
   force = false,
+  sourceOverride?: string,
 ): Promise<ScanResultPayload> {
   return withDb(dbPath, async (db) => {
     const settingsRepository = createSettingsRepository(db);
-    const sourceConfig = requireSourceConfig(settingsRepository.getSourceConfig());
+    const sourceConfig = requireSourceConfig(
+      settingsRepository.getSourceConfig(),
+      sourceOverride,
+    );
     const adapter = await loadAdapter(sourceConfig.source);
 
     const validation = await adapter.validate(toAdapterOptions(sourceConfig));
