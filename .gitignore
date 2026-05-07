@@ -1,6 +1,8 @@
 node_modules
 dist
 coverage
+packages/cli/dashboard
+*.tgz
 *.db
 *.db-shm
 *.db-wal

@@ -22,17 +22,21 @@
     "token"
   ],
   "files": [
-    "src"
+    "src",
+    "dashboard"
   ],
   "exports": {
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "bun test"
+    "test": "bun test",
+    "bundle:dashboard": "bun run scripts/bundle-dashboard.ts",
+    "prepack": "bun run bundle:dashboard"
   },
   "dependencies": {
     "@langcost/analyzers": "workspace:*",
     "@langcost/core": "workspace:*",
-    "@langcost/db": "workspace:*"
+    "@langcost/db": "workspace:*",
+    "hono": "^4.12.8"
   }
 }

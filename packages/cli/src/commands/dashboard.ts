@@ -9,6 +9,14 @@ import type {
 } from "../types";
 
 async function loadDashboardModule(): Promise<DashboardModule> {
+  // Published tarball ships the API at packages/cli/dashboard/api/.
+  try {
+    return (await import(
+      new URL("../../dashboard/api/index.ts", import.meta.url).href
+    )) as DashboardModule;
+  } catch {}
+
+  // Workspace dev fallback: import the live @langcost/api source.
   try {
     return (await import("@langcost/api")) as DashboardModule;
   } catch {
