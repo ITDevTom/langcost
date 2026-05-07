@@ -22,13 +22,20 @@ export interface ApiAppOptions {
 function resolveWebDistPath(path?: string) {
   if (path) return path;
 
-  // Resolve relative to this file's location (apps/api/src/index.ts → apps/web/dist)
-  const fromModule = new URL("../../web/dist", import.meta.url);
-  try {
-    if (fromModule.protocol === "file:") {
-      return fromModule.pathname;
+  // Try each candidate location and pick the first that exists. Order matters:
+  // when bundled into the langcost CLI, the file is at packages/cli/dashboard/api/index.ts
+  // and the web build sits next to it at packages/cli/dashboard/web/.
+  const candidates = [
+    new URL("../web", import.meta.url), // bundled CLI: packages/cli/dashboard/web
+    new URL("../../web/dist", import.meta.url), // workspace dev: apps/web/dist
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate.protocol !== "file:") continue;
+    if (existsSync(candidate.pathname)) {
+      return candidate.pathname;
     }
-  } catch {}
+  }
 
   return join(process.cwd(), "apps", "web", "dist");
 }

@@ -1,6 +1,6 @@
 {
   "name": "@langcost/adapter-warp",
-  "version": "0.1.0",
+  "version": "0.1.4",
   "type": "module",
   "publishConfig": {
     "access": "public"
@@ -15,7 +15,7 @@
   "license": "AGPL-3.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vjvkrm/langcost",
+    "url": "git+https://github.com/vjvkrm/langcost.git",
     "directory": "packages/adapter-warp"
   },
   "scripts": {

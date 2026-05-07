@@ -74,12 +74,13 @@
       "name": "langcost",
       "version": "0.1.4",
       "bin": {
-        "langcost": "./src/index.ts",
+        "langcost": "src/index.ts",
       },
       "dependencies": {
         "@langcost/analyzers": "workspace:*",
         "@langcost/core": "workspace:*",
         "@langcost/db": "workspace:*",
+        "hono": "^4.12.8",
       },
     },
     "packages/core": {

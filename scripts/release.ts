@@ -24,6 +24,7 @@ const packages: ReleasePackage[] = [
   { dir: "packages/analyzers", access: "public" },
   { dir: "packages/adapter-openclaw", access: "public" },
   { dir: "packages/adapter-claude-code", access: "public" },
+  { dir: "packages/adapter-warp", access: "public" },
   { dir: "packages/cli", access: "public" },
 ];
 
