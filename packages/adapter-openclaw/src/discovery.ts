@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 
@@ -5,7 +6,18 @@ import type { IngestOptions } from "@langcost/core";
 
 import type { DiscoveredSessionFile } from "./types";
 
-const DEFAULT_OPENCLAW_ROOT = join(process.env.HOME ?? ".", ".openclaw");
+function candidateRoots(): string[] {
+  const home = process.env.HOME ?? ".";
+  const xdgData = process.env.XDG_DATA_HOME ?? join(home, ".local", "share");
+  return [
+    join(home, ".openclaw"),
+    join(home, "Library", "Application Support", "openclaw"),
+    join(xdgData, "openclaw"),
+    join(home, "openclaw"),
+  ];
+}
+
+const DEFAULT_OPENCLAW_ROOT = candidateRoots()[0]!;
 
 function expandHomePath(path: string): string {
   const home = process.env.HOME;
@@ -24,6 +36,24 @@ function expandHomePath(path: string): string {
   return path;
 }
 
+async function hasAgentsDir(root: string): Promise<boolean> {
+  try {
+    const info = await stat(join(root, "agents"));
+    return info.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+async function autoDiscoverRoot(): Promise<string | null> {
+  for (const root of candidateRoots()) {
+    if (await hasAgentsDir(root)) {
+      return root;
+    }
+  }
+  return null;
+}
+
 function isWithinSince(modifiedAt: Date, since?: Date): boolean {
   return since ? modifiedAt.getTime() >= since.getTime() : true;
 }
@@ -40,6 +70,20 @@ function extractAgentId(filePath: string): string | undefined {
 
 export function getOpenClawRoot(sourcePath?: string): string {
   return expandHomePath(sourcePath ?? DEFAULT_OPENCLAW_ROOT);
+}
+
+export async function resolveOpenClawRoot(
+  sourcePath?: string,
+): Promise<{ root: string; autoDiscovered: boolean; tried: string[] }> {
+  if (sourcePath) {
+    return { root: expandHomePath(sourcePath), autoDiscovered: false, tried: [] };
+  }
+
+  const tried = candidateRoots();
+  const found = await autoDiscoverRoot();
+  return found
+    ? { root: found, autoDiscovered: true, tried }
+    : { root: DEFAULT_OPENCLAW_ROOT, autoDiscovered: false, tried };
 }
 
 async function discoverFromSingleFile(
@@ -67,7 +111,15 @@ async function discoverFromSingleFile(
 
 async function discoverFromRoot(rootPath: string, since?: Date): Promise<DiscoveredSessionFile[]> {
   const agentsPath = join(rootPath, "agents");
-  const agentDirectories = await readdir(agentsPath, { withFileTypes: true, encoding: "utf8" });
+  let agentDirectories: Dirent[];
+  try {
+    agentDirectories = await readdir(agentsPath, { withFileTypes: true, encoding: "utf8" });
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+      return [];
+    }
+    throw error;
+  }
   const discovered: DiscoveredSessionFile[] = [];
 
   for (const entry of agentDirectories) {
@@ -117,5 +169,6 @@ export async function discoverSessionFiles(
     return discoverFromSingleFile(expandHomePath(options.file), options.since);
   }
 
-  return discoverFromRoot(getOpenClawRoot(options.sourcePath), options.since);
+  const { root } = await resolveOpenClawRoot(options.sourcePath);
+  return discoverFromRoot(root, options.since);
 }

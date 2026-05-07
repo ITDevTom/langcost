@@ -397,10 +397,10 @@ export async function saveSettings(input: SaveSettingsInput): Promise<{ ok: bool
   });
 }
 
-export async function triggerScan(force = false): Promise<ScanResponse> {
+export async function triggerScan(force = false, source?: string): Promise<ScanResponse> {
   return request<ScanResponse>("/scan", {
     method: "POST",
-    body: JSON.stringify({ force }),
+    body: JSON.stringify({ force, ...(source ? { source } : {}) }),
   });
 }
 

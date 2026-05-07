@@ -571,6 +571,19 @@ h4,
     color: color-mix(in srgb, var(--text-primary) 86%, var(--accent-red));
   }
 
+  .spinner {
+    @apply inline-block h-4 w-4 rounded-full border-2;
+    border-color: color-mix(in srgb, currentColor 30%, transparent);
+    border-top-color: currentColor;
+    animation: lc-spin 0.8s linear infinite;
+  }
+
+  @keyframes lc-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   .trace-table {
     color: var(--text-primary);
   }

@@ -10,7 +10,7 @@ import {
   createTraceRepository,
 } from "@langcost/db";
 
-import { discoverSessionFiles, getOpenClawRoot } from "./discovery";
+import { discoverSessionFiles, resolveOpenClawRoot } from "./discovery";
 import { normalizeSession } from "./normalizer";
 import { readSessionFile } from "./reader";
 
@@ -59,32 +59,43 @@ export const openClawAdapter: IAdapter<Db> = {
           : { ok: false, message: `OpenClaw session file not found: ${options.file}` };
       }
 
-      const root = getOpenClawRoot(options?.sourcePath);
-      const agentsPath = join(root, "agents");
+      const resolved = await resolveOpenClawRoot(options?.sourcePath);
 
-      try {
-        const agentsDirectory = await stat(agentsPath);
-        if (!agentsDirectory.isDirectory()) {
-          return {
-            ok: false,
-            message: `OpenClaw agents directory not found: ${agentsPath}. Check your source path in Settings.`,
-          };
-        }
-      } catch (error) {
-        if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-          return {
-            ok: false,
-            message: `OpenClaw agents directory not found: ${agentsPath}. Check your source path in Settings.`,
-          };
-        }
+      if (!options?.sourcePath && !resolved.autoDiscovered) {
+        return {
+          ok: false,
+          message: `OpenClaw not found in default locations (${resolved.tried.join(", ")}). If you have it installed elsewhere, set the path in Settings.`,
+        };
+      }
 
-        throw error;
+      if (options?.sourcePath) {
+        const agentsPath = join(resolved.root, "agents");
+        try {
+          const info = await stat(agentsPath);
+          if (!info.isDirectory()) {
+            return {
+              ok: false,
+              message: `OpenClaw agents directory not found: ${agentsPath}. Check your source path in Settings.`,
+            };
+          }
+        } catch (error) {
+          if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+            return {
+              ok: false,
+              message: `OpenClaw agents directory not found: ${agentsPath}. Check your source path in Settings.`,
+            };
+          }
+          throw error;
+        }
       }
 
       const discovered = await discoverSessionFiles(options);
       return discovered.length > 0
-        ? { ok: true, message: `Found ${discovered.length} OpenClaw session files under ${root}` }
-        : { ok: false, message: `No OpenClaw session files found under ${root}` };
+        ? {
+            ok: true,
+            message: `Found ${discovered.length} OpenClaw session files under ${resolved.root}`,
+          }
+        : { ok: false, message: `No OpenClaw session files found under ${resolved.root}` };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown validation failure";
       return { ok: false, message };
