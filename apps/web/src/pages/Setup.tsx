@@ -81,6 +81,12 @@ export function Setup({ initialSettings, onConfigured }: SetupProps) {
                   <div className="mt-4 text-sm text-blue-200">Available now</div>
                 </button>
               ))}
+
+              <div className="soft-card opacity-70">
+                <div className="text-lg font-medium text-slate-100">Langfuse</div>
+                <div className="mt-2 text-sm text-slate-400">Remote traces over API</div>
+                <div className="mt-4 text-sm text-slate-500">Coming soon</div>
+              </div>
             </div>
           </div>
 
