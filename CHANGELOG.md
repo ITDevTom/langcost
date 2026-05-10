@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.6] - 2026-05-08
+
+### Fixed
+- **Dashboard**: Setup and settings now allow selecting OpenClaw, Claude Code, or Warp data sources instead of forcing OpenClaw.
+
 ## [0.1.4] - 2026-04-29
 
 ### Fixed

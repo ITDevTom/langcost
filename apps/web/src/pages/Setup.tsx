@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 
 import { type SettingsResponse, saveSettings, triggerScan } from "../api/client";
+import { DEFAULT_SOURCE, getSourceOption, SOURCE_OPTIONS } from "../lib/sources";
 
 interface SetupProps {
   initialSettings: SettingsResponse | null;
@@ -8,13 +9,22 @@ interface SetupProps {
 }
 
 export function Setup({ initialSettings, onConfigured }: SetupProps) {
-  const [source, setSource] = useState(initialSettings?.source ?? "openclaw");
-  const [sourcePath, setSourcePath] = useState(initialSettings?.sourcePath ?? "~/.openclaw");
+  const [source, setSource] = useState(initialSettings?.source ?? DEFAULT_SOURCE.value);
+  const [sourcePath, setSourcePath] = useState(
+    initialSettings?.sourcePath ?? getSourceOption(initialSettings?.source).defaultSourcePath,
+  );
   const [apiUrl, setApiUrl] = useState(initialSettings?.apiUrl ?? "");
   const [apiKey, setApiKey] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const selectedSource = getSourceOption(source);
+
+  function handleSourceChange(nextSource: string) {
+    setSource(nextSource);
+    setSourcePath(getSourceOption(nextSource).defaultSourcePath);
+  }
 
   async function handleConnect(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,19 +65,22 @@ export function Setup({ initialSettings, onConfigured }: SetupProps) {
             </p>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setSource("openclaw")}
-                className={`rounded-2xl border p-4 text-left transition ${
-                  source === "openclaw"
-                    ? "border-blue-400/40 bg-blue-500/10"
-                    : "border-[color:var(--border)] bg-[color:var(--surface-alt)] hover:bg-[color:var(--surface-hover)]"
-                }`}
-              >
-                <div className="text-lg font-medium text-slate-100">OpenClaw</div>
-                <div className="mt-2 text-sm text-slate-400">Local JSONL sessions on disk</div>
-                <div className="mt-4 text-sm text-blue-200">Available now</div>
-              </button>
+              {SOURCE_OPTIONS.map((option) => (
+                <button
+                  type="button"
+                  key={option.value}
+                  onClick={() => handleSourceChange(option.value)}
+                  className={`rounded-2xl border p-4 text-left transition ${
+                    source === option.value
+                      ? "border-blue-400/40 bg-blue-500/10"
+                      : "border-[color:var(--border)] bg-[color:var(--surface-alt)] hover:bg-[color:var(--surface-hover)]"
+                  }`}
+                >
+                  <div className="text-lg font-medium text-slate-100">{option.label}</div>
+                  <div className="mt-2 text-sm text-slate-400">{option.description}</div>
+                  <div className="mt-4 text-sm text-blue-200">Available now</div>
+                </button>
+              ))}
 
               <div className="soft-card opacity-70">
                 <div className="text-lg font-medium text-slate-100">Langfuse</div>
@@ -84,19 +97,23 @@ export function Setup({ initialSettings, onConfigured }: SetupProps) {
               <span className="mb-2 block text-slate-400">Source</span>
               <select
                 value={source}
-                onChange={(event) => setSource(event.target.value)}
+                onChange={(event) => handleSourceChange(event.target.value)}
                 className="field-shell w-full"
               >
-                <option value="openclaw">OpenClaw</option>
+                {SOURCE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </label>
 
             <label className="mt-4 block text-sm">
-              <span className="mb-2 block text-slate-400">OpenClaw path</span>
+              <span className="mb-2 block text-slate-400">{selectedSource.sourcePathLabel}</span>
               <input
                 value={sourcePath}
                 onChange={(event) => setSourcePath(event.target.value)}
-                placeholder="~/.openclaw"
+                placeholder={selectedSource.sourcePathPlaceholder}
                 className="field-shell w-full"
               />
             </label>

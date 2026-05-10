@@ -2,6 +2,7 @@ import { type FormEvent, useEffect, useState } from "react";
 
 import { type HealthResponse, type SettingsResponse, saveSettings } from "../api/client";
 import { formatBytes, formatInt, formatRelativeTime } from "../lib/format";
+import { DEFAULT_SOURCE, getSourceOption, SOURCE_OPTIONS } from "../lib/sources";
 
 interface SettingsProps {
   settings: SettingsResponse | null;
@@ -18,7 +19,7 @@ export function Settings({
   onSettingsSaved,
   onRefreshData,
 }: SettingsProps) {
-  const [source, setSource] = useState(settings?.source ?? "openclaw");
+  const [source, setSource] = useState(settings?.source ?? DEFAULT_SOURCE.value);
   const [sourcePath, setSourcePath] = useState(settings?.sourcePath ?? "");
   const [apiUrl, setApiUrl] = useState(settings?.apiUrl ?? "");
   const [apiKey, setApiKey] = useState("");
@@ -27,10 +28,17 @@ export function Settings({
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
-    setSource(settings?.source ?? "openclaw");
+    setSource(settings?.source ?? DEFAULT_SOURCE.value);
     setSourcePath(settings?.sourcePath ?? "");
     setApiUrl(settings?.apiUrl ?? "");
   }, [settings]);
+
+  const selectedSource = getSourceOption(source);
+
+  function handleSourceChange(nextSource: string) {
+    setSource(nextSource);
+    setSourcePath(getSourceOption(nextSource).defaultSourcePath);
+  }
 
   async function handleSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -72,18 +80,23 @@ export function Settings({
           <span className="mb-2 block text-slate-400">Source</span>
           <select
             value={source}
-            onChange={(event) => setSource(event.target.value)}
+            onChange={(event) => handleSourceChange(event.target.value)}
             className="field-shell w-full"
           >
-            <option value="openclaw">OpenClaw</option>
+            {SOURCE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </label>
 
         <label className="mt-4 block text-sm">
-          <span className="mb-2 block text-slate-400">Source path</span>
+          <span className="mb-2 block text-slate-400">{selectedSource.sourcePathLabel}</span>
           <input
             value={sourcePath}
             onChange={(event) => setSourcePath(event.target.value)}
+            placeholder={selectedSource.sourcePathPlaceholder}
             className="field-shell w-full"
           />
         </label>
