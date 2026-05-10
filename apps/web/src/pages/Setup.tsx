@@ -78,7 +78,6 @@ export function Setup({ initialSettings, onConfigured }: SetupProps) {
                 >
                   <div className="text-lg font-medium text-slate-100">{option.label}</div>
                   <div className="mt-2 text-sm text-slate-400">{option.description}</div>
-                  <div className="mt-4 text-sm text-blue-200">Available now</div>
                 </button>
               ))}
 
