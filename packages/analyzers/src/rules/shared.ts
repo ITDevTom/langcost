@@ -116,11 +116,9 @@ export function findCheaperModel(model: string): string | undefined {
 export function estimateModelSavings(spans: SpanRecord[], replacementModel: string): number {
   return spans.reduce((total, span) => {
     const existingCost = getSpanCost(span);
-    const projectedCost = calculateCost(
-      replacementModel,
-      span.inputTokens ?? 0,
-      span.outputTokens ?? 0,
-    ).totalCost;
+    const projectedCost =
+      calculateCost(replacementModel, span.inputTokens ?? 0, span.outputTokens ?? 0)?.totalCost ??
+      0;
     return total + Math.max(0, existingCost - projectedCost);
   }, 0);
 }

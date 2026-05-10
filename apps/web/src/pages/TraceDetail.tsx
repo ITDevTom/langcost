@@ -297,9 +297,9 @@ function WarpArbitrageSection({ trace }: { trace: TraceSummary }) {
   if (!arbitrage) return null;
 
   const { creditCostUsd, apiCostUsd, costMarkupPct, warpPlan, billingMode } = arbitrage;
-  const delta = creditCostUsd - apiCostUsd;
-  const comparable = apiCostUsd > 0;
-  const cheaper = comparable && delta < 0;
+  const comparable = apiCostUsd !== null && apiCostUsd > 0;
+  const delta = comparable ? creditCostUsd - apiCostUsd : null;
+  const cheaper = delta !== null && delta < 0;
   const deltaTone = !comparable
     ? "text-slate-400"
     : cheaper
@@ -344,14 +344,12 @@ function WarpArbitrageSection({ trace }: { trace: TraceSummary }) {
       <div className="mt-5 grid gap-4 sm:grid-cols-3">
         <div className="soft-card">
           <div className="text-xs text-slate-500">Paid (Warp credits)</div>
-          <div className="mt-1 text-xl font-semibold text-slate-50">
-            {formatUsd(creditCostUsd)}
-          </div>
+          <div className="mt-1 text-xl font-semibold text-slate-50">{formatUsd(creditCostUsd)}</div>
         </div>
         <div className="soft-card">
           <div className="text-xs text-slate-500">API-equivalent</div>
           <div className="mt-1 text-xl font-semibold text-slate-50">
-            {comparable ? formatUsd(apiCostUsd) : "—"}
+            {comparable ? formatUsd(apiCostUsd) : "-"}
           </div>
           {!comparable ? (
             <div className="mt-1 text-xs text-slate-500">model not yet priced</div>
@@ -363,7 +361,7 @@ function WarpArbitrageSection({ trace }: { trace: TraceSummary }) {
             {comparable ? (
               <>
                 {cheaper ? "−" : "+"}
-                {formatUsd(Math.abs(delta))}
+                {formatUsd(Math.abs(delta ?? 0))}
                 {costMarkupPct !== null ? (
                   <span className="ml-2 text-sm font-normal text-slate-400">
                     ({formatPercent(Math.abs(costMarkupPct))} {cheaper ? "lower" : "higher"})
@@ -371,7 +369,7 @@ function WarpArbitrageSection({ trace }: { trace: TraceSummary }) {
                 ) : null}
               </>
             ) : (
-              "—"
+              "-"
             )}
           </div>
         </div>
@@ -441,9 +439,7 @@ function ClaudeCodeTokensSection({ trace }: { trace: TraceSummary }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="section-kicker">Tokens</div>
-          <h2 className="mt-2 text-lg font-semibold text-slate-100">
-            API-equivalent breakdown
-          </h2>
+          <h2 className="mt-2 text-lg font-semibold text-slate-100">API-equivalent breakdown</h2>
           <p className="mt-1 text-sm text-slate-500">
             Where this session's tokens went, priced at Anthropic API rates.
           </p>

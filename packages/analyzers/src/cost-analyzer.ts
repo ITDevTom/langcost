@@ -124,7 +124,9 @@ async function buildSegmentsForSpan(
   const spanTotalTokens = spanInputTokens + spanOutputTokens;
   const spanCost =
     span.costUsd ??
-    (span.model ? calculateCost(span.model, spanInputTokens, spanOutputTokens).totalCost : 0);
+    (span.model
+      ? (calculateCost(span.model, spanInputTokens, spanOutputTokens)?.totalCost ?? 0)
+      : 0);
 
   if (span.type === "tool") {
     const content =

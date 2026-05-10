@@ -108,7 +108,7 @@ export interface WarpArbitrageAggregate {
 
 export interface WarpArbitrageMetadata {
   creditCostUsd: number;
-  apiCostUsd: number;
+  apiCostUsd: number | null;
   costMarkupPct: number | null;
   warpPlan: string;
   effectiveCreditRateUsd: number;
@@ -175,8 +175,8 @@ export function readWarpArbitrage(trace: TraceSummary): WarpArbitrageMetadata | 
   const meta = trace.metadata;
   const creditCostUsd = typeof meta.creditCostUsd === "number" ? meta.creditCostUsd : null;
   const apiCostUsd = typeof meta.apiCostUsd === "number" ? meta.apiCostUsd : null;
-  if (creditCostUsd === null || apiCostUsd === null) return null;
-  if (creditCostUsd === 0 && apiCostUsd === 0) return null;
+  if (creditCostUsd === null) return null;
+  if (creditCostUsd === 0 && (apiCostUsd === null || apiCostUsd === 0)) return null;
   return {
     creditCostUsd,
     apiCostUsd,
@@ -186,9 +186,7 @@ export function readWarpArbitrage(trace: TraceSummary): WarpArbitrageMetadata | 
       typeof meta.effectiveCreditRateUsd === "number" ? meta.effectiveCreditRateUsd : 0,
     creditsSpent: typeof meta.creditsSpent === "number" ? meta.creditsSpent : 0,
     billingMode:
-      meta.billingMode === "credit" ||
-      meta.billingMode === "byok" ||
-      meta.billingMode === "mixed"
+      meta.billingMode === "credit" || meta.billingMode === "byok" || meta.billingMode === "mixed"
         ? meta.billingMode
         : "unknown",
   };

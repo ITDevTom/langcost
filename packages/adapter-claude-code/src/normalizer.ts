@@ -187,11 +187,11 @@ function calculateCostFromUsage(usage: ClaudeCodeUsage, model: string) {
     outputTokens,
     cacheCreationTokens,
     cacheReadTokens,
-    costUsd: cost.totalCost,
-    inputCostUsd: cost.inputCost,
-    outputCostUsd: cost.outputCost,
-    cacheWriteCostUsd: cost.cacheWriteCost,
-    cacheReadCostUsd: cost.cacheReadCost,
+    costUsd: cost?.totalCost ?? null,
+    inputCostUsd: cost?.inputCost ?? 0,
+    outputCostUsd: cost?.outputCost ?? 0,
+    cacheWriteCostUsd: cost?.cacheWriteCost ?? 0,
+    cacheReadCostUsd: cost?.cacheReadCost ?? 0,
   };
 }
 
@@ -482,7 +482,7 @@ export function normalizeConversation(
 
       totalInputTokens += costData.inputTokens;
       totalOutputTokens += costData.outputTokens;
-      totalCostUsd += costData.costUsd;
+      totalCostUsd += costData.costUsd ?? 0;
       totalCacheCreationTokens += costData.cacheCreationTokens;
       totalCacheReadTokens += costData.cacheReadTokens;
       totalInputCostUsd += costData.inputCostUsd;

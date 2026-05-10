@@ -29,11 +29,7 @@ export function calculateCost(model: string, inputTokens: number, outputTokens: 
 
   const pricing = findPricing(model);
   if (!pricing) {
-    return {
-      inputCost: 0,
-      outputCost: 0,
-      totalCost: 0,
-    };
+    return null;
   }
 
   const inputCost = (inputTokens / 1_000_000) * pricing.inputPricePerMToken;
@@ -61,13 +57,7 @@ export function calculateCostWithCache(
 
   const pricing = findPricing(model);
   if (!pricing) {
-    return {
-      inputCost: 0,
-      outputCost: 0,
-      cacheWriteCost: 0,
-      cacheReadCost: 0,
-      totalCost: 0,
-    };
+    return null;
   }
 
   const cacheWritePrice =

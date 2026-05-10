@@ -267,14 +267,71 @@ describe("normalizeConversation", () => {
       expect(trace.metadata?.costMarkupPct).toBeCloseTo(337.037037037037, 8);
       expect(trace.metadata?.billingMode).toBe("mixed");
     });
+
+    it("computes API comparator cost for GPT-5.3 Codex medium sessions", () => {
+      const { trace } = normalizeConversation(
+        aConversationWithUsage([
+          aTokenUsage({
+            model_id: "GPT-5.3 Codex (medium reasoning)",
+            warp_tokens: 1000,
+            byok_tokens: 0,
+            warp_token_usage_by_category: { primary_agent: 1000 },
+            byok_token_usage_by_category: {},
+          }),
+        ]),
+        [anExchange({ model_id: "GPT-5.3 Codex (medium reasoning)" })],
+        [],
+      );
+
+      expect(trace.model).toBe("gpt-5.3-codex");
+      expect(trace.metadata?.apiCostUsd).toBeCloseTo(0.00175, 8);
+    });
+
+    it("uses priority pricing for GPT-5.3 Codex extra-high sessions", () => {
+      const { trace } = normalizeConversation(
+        aConversationWithUsage([
+          aTokenUsage({
+            model_id: "gpt-5.3-codex-extra-high",
+            warp_tokens: 1000,
+            byok_tokens: 0,
+            warp_token_usage_by_category: { primary_agent: 1000 },
+            byok_token_usage_by_category: {},
+          }),
+        ]),
+        [anExchange({ model_id: "gpt-5.3-codex-extra-high" })],
+        [],
+      );
+
+      expect(trace.model).toBe("gpt-5.3-codex-priority");
+      expect(trace.metadata?.apiCostUsd).toBeCloseTo(0.0035, 8);
+    });
+
+    it("uses null API comparator cost for unpriced models", () => {
+      const { trace, spans } = normalizeConversation(
+        aConversationWithUsage([
+          aTokenUsage({
+            model_id: "some-unknown-model",
+            warp_tokens: 1000,
+            byok_tokens: 0,
+            warp_token_usage_by_category: { primary_agent: 1000 },
+            byok_token_usage_by_category: {},
+          }),
+        ]),
+        [anExchange({ model_id: "some-unknown-model" })],
+        [],
+      );
+      const llm = spans.find((s) => s.type === "llm");
+
+      expect(trace.metadata?.apiCostUsd).toBeNull();
+      expect(trace.metadata?.costMarkupPct).toBeNull();
+      expect(llm?.provider).toBeNull();
+      expect(llm?.costUsd).toBeNull();
+    });
   });
 
   describe("LLM spans", () => {
     it("creates one LLM span per exchange", () => {
-      const exchanges = [
-        anExchange({ exchange_id: "ex-1" }),
-        anExchange({ exchange_id: "ex-2" }),
-      ];
+      const exchanges = [anExchange({ exchange_id: "ex-1" }), anExchange({ exchange_id: "ex-2" })];
       const { spans } = normalizeConversation(aConversation(), exchanges, []);
       const llmSpans = spans.filter((s) => s.type === "llm");
 
@@ -298,12 +355,13 @@ describe("normalizeConversation", () => {
     it("sets provider to openai for a GPT model", () => {
       const { spans } = normalizeConversation(
         aConversation(),
-        [anExchange({ model_id: "gpt-4.1" })],
+        [anExchange({ model_id: "GPT-5.4" })],
         [],
       );
       const llm = spans.find((s) => s.type === "llm");
 
       expect(llm?.provider).toBe("openai");
+      expect(llm?.model).toBe("gpt-5.4");
     });
 
     it("sets provider to null for an unrecognised model", () => {
@@ -384,7 +442,16 @@ describe("normalizeConversation", () => {
       const { spans } = normalizeConversation(
         aConversation(),
         [anExchange()],
-        [aBlock({ block_id: "b-1" }), aBlock({ block_id: "b-2", ai_metadata: JSON.stringify({ requested_command_action_id: "toolu_02", conversation_id: CONVERSATION_ID }) })],
+        [
+          aBlock({ block_id: "b-1" }),
+          aBlock({
+            block_id: "b-2",
+            ai_metadata: JSON.stringify({
+              requested_command_action_id: "toolu_02",
+              conversation_id: CONVERSATION_ID,
+            }),
+          }),
+        ],
       );
       const toolSpans = spans.filter((s) => s.type === "tool");
 
@@ -395,11 +462,7 @@ describe("normalizeConversation", () => {
       const noToolIdBlock = aBlock({
         ai_metadata: JSON.stringify({ conversation_id: CONVERSATION_ID }),
       });
-      const { spans } = normalizeConversation(
-        aConversation(),
-        [anExchange()],
-        [noToolIdBlock],
-      );
+      const { spans } = normalizeConversation(aConversation(), [anExchange()], [noToolIdBlock]);
       const toolSpans = spans.filter((s) => s.type === "tool");
 
       expect(toolSpans).toHaveLength(0);
@@ -502,7 +565,7 @@ describe("normalizeConversation", () => {
       );
       const tool = spans.find((s) => s.type === "tool");
 
-      expect((tool?.toolOutput?.length ?? 0)).toBeLessThanOrEqual(65_536);
+      expect(tool?.toolOutput?.length ?? 0).toBeLessThanOrEqual(65_536);
     });
 
     it("strips OSC escape sequences from toolOutput", () => {
@@ -543,11 +606,7 @@ describe("normalizeConversation", () => {
 
     it("does NOT create a user message when input has no Query entry", () => {
       const emptyInputExchange = anExchange({ input: "[]" });
-      const { messages } = normalizeConversation(
-        aConversation(),
-        [emptyInputExchange],
-        [],
-      );
+      const { messages } = normalizeConversation(aConversation(), [emptyInputExchange], []);
       const userMessages = messages.filter((m) => m.role === "user");
 
       expect(userMessages).toHaveLength(0);
@@ -557,11 +616,7 @@ describe("normalizeConversation", () => {
       const noTextExchange = anExchange({
         input: JSON.stringify([{ Query: { text: "", context: [] } }]),
       });
-      const { messages } = normalizeConversation(
-        aConversation(),
-        [noTextExchange],
-        [],
-      );
+      const { messages } = normalizeConversation(aConversation(), [noTextExchange], []);
       const userMessages = messages.filter((m) => m.role === "user");
 
       expect(userMessages).toHaveLength(0);
@@ -591,11 +646,7 @@ describe("normalizeConversation", () => {
 
     it("attaches user message to the correct LLM span", () => {
       const exchange = anExchange({ exchange_id: "ex-abc" });
-      const { spans, messages } = normalizeConversation(
-        aConversation(),
-        [exchange],
-        [],
-      );
+      const { spans, messages } = normalizeConversation(aConversation(), [exchange], []);
       const llmSpan = spans.find((s) => s.externalId === "ex-abc");
       const userMsg = messages.find((m) => m.role === "user");
 
@@ -603,11 +654,7 @@ describe("normalizeConversation", () => {
     });
 
     it("assigns sequential positions to messages on the same span", () => {
-      const { messages } = normalizeConversation(
-        aConversation(),
-        [anExchange()],
-        [aBlock()],
-      );
+      const { messages } = normalizeConversation(aConversation(), [anExchange()], [aBlock()]);
 
       const llmMsg = messages.find((m) => m.role === "user");
       const toolMsg = messages.find((m) => m.role === "tool");
