@@ -11,6 +11,10 @@ describe("findPricing", () => {
     expect(findPricing("SONNET-4")?.model).toBe("claude-sonnet-4-20250514");
   });
 
+  it("matches Gemini 3 Pro aliases to the current canonical model", () => {
+    expect(findPricing("gemini-3-pro")?.model).toBe("gemini-3.1-pro-preview");
+  });
+
   it("distinguishes Opus 4.6 from Opus 4.0 pricing", () => {
     const opus46 = findPricing("claude-opus-4-6");
     const opus4 = findPricing("claude-opus-4");
@@ -51,6 +55,30 @@ describe("calculateCost", () => {
       outputCost: 14,
       totalCost: 17.5,
     });
+  });
+
+  it("calculates Gemini 3.1 Pro cost", () => {
+    expect(calculateCost("gemini-3.1-pro-preview", 1_000_000, 500_000)).toEqual({
+      inputCost: 2,
+      outputCost: 6,
+      totalCost: 8,
+    });
+  });
+
+  it("calculates Gemini 3 Flash cost", () => {
+    expect(calculateCost("gemini-3-flash-preview", 1_000_000, 500_000)).toEqual({
+      inputCost: 0.5,
+      outputCost: 1.5,
+      totalCost: 2,
+    });
+  });
+
+  it("calculates Gemini 2.5 Flash-Lite cost", () => {
+    const result = calculateCost("gemini-2.5-flash-lite", 1_000_000, 500_000);
+
+    expect(result?.inputCost).toBeCloseTo(0.1, 8);
+    expect(result?.outputCost).toBeCloseTo(0.2, 8);
+    expect(result?.totalCost).toBeCloseTo(0.3, 8);
   });
 
   it("returns null for unknown models", () => {

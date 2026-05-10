@@ -306,6 +306,28 @@ describe("normalizeConversation", () => {
       expect(trace.metadata?.apiCostUsd).toBeCloseTo(0.0035, 8);
     });
 
+    it("computes API comparator cost for Gemini sessions", () => {
+      const { trace, spans } = normalizeConversation(
+        aConversationWithUsage([
+          aTokenUsage({
+            model_id: "Gemini 3.1 Pro",
+            warp_tokens: 1000,
+            byok_tokens: 0,
+            warp_token_usage_by_category: { primary_agent: 1000 },
+            byok_token_usage_by_category: {},
+          }),
+        ]),
+        [anExchange({ model_id: "Gemini 3.1 Pro" })],
+        [],
+      );
+      const llm = spans.find((s) => s.type === "llm");
+
+      expect(trace.model).toBe("gemini-3.1-pro-preview");
+      expect(trace.metadata?.apiCostUsd).toBeCloseTo(0.002, 8);
+      expect(llm?.model).toBe("gemini-3.1-pro-preview");
+      expect(llm?.provider).toBe("google");
+    });
+
     it("uses null API comparator cost for unpriced models", () => {
       const { trace, spans } = normalizeConversation(
         aConversationWithUsage([
