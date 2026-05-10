@@ -9,7 +9,7 @@
     "cacheWrites": 22968,
     "cacheReads": 49324,
     "totalCost": 0.2271264,
-    "cwdOnTaskInitialization": "/Users/tomdootson/Projects/langcost",
+    "cwdOnTaskInitialization": "/Users/test/Projects/langcost",
     "modelId": "anthropic/claude-sonnet-4.5"
   }
 ]
