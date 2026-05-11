@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
@@ -7,6 +8,17 @@ import type { ClineTaskHistoryItem, DiscoveredClineTaskFile } from "./types";
 
 function candidateRoots(): string[] {
   const home = process.env.HOME ?? ".";
+  const appData = process.env.APPDATA;
+  const xdgConfigHome = process.env.XDG_CONFIG_HOME;
+  const linuxConfigRoot = xdgConfigHome ?? join(home, ".config");
+  const windowsRoots = appData
+    ? [
+        join(appData, "Code", "User", "globalStorage", "saoudrizwan.claude-dev"),
+        join(appData, "Code - Insiders", "User", "globalStorage", "saoudrizwan.claude-dev"),
+        join(appData, "Cursor", "User", "globalStorage", "saoudrizwan.claude-dev"),
+        join(appData, "Cursor - Insiders", "User", "globalStorage", "saoudrizwan.claude-dev"),
+      ]
+    : [];
   return [
     join(
       home,
@@ -44,10 +56,15 @@ function candidateRoots(): string[] {
       "globalStorage",
       "saoudrizwan.claude-dev",
     ),
+    join(linuxConfigRoot, "Code", "User", "globalStorage", "saoudrizwan.claude-dev"),
+    join(linuxConfigRoot, "Code - Insiders", "User", "globalStorage", "saoudrizwan.claude-dev"),
+    join(linuxConfigRoot, "Cursor", "User", "globalStorage", "saoudrizwan.claude-dev"),
+    join(linuxConfigRoot, "Cursor - Insiders", "User", "globalStorage", "saoudrizwan.claude-dev"),
+    ...windowsRoots,
   ];
 }
 
-const DEFAULT_CLINE_ROOT = candidateRoots()[0]!;
+const DEFAULT_CLINE_ROOT = candidateRoots()[0] ?? ".";
 
 function expandHomePath(path: string): string {
   const home = process.env.HOME;
@@ -86,7 +103,7 @@ async function readTaskHistory(rootPath: string): Promise<Map<string, ClineTaskH
     const items: ClineTaskHistoryItem[] = Array.isArray(parsed)
       ? (parsed as ClineTaskHistoryItem[])
       : Array.isArray((parsed as { taskHistory?: unknown }).taskHistory)
-        ? ((parsed as { taskHistory: ClineTaskHistoryItem[] }).taskHistory)
+        ? (parsed as { taskHistory: ClineTaskHistoryItem[] }).taskHistory
         : [];
     return new Map(items.filter((item) => item.id).map((item) => [item.id, item]));
   } catch {
@@ -130,7 +147,11 @@ async function discoverFromUiMessagesFile(
   const modifiedAt = stats.mtime;
   const rootPath = rootFromUiMessagesPath(filePath);
 
-  if (!stats.isFile() || basename(filePath) !== "ui_messages.json" || !isWithinSince(modifiedAt, since)) {
+  if (
+    !stats.isFile() ||
+    basename(filePath) !== "ui_messages.json" ||
+    !isWithinSince(modifiedAt, since)
+  ) {
     return [];
   }
 
@@ -152,12 +173,15 @@ async function discoverFromTaskDirectory(
   return discoverFromUiMessagesFile(join(taskDir, "ui_messages.json"), since).catch(() => []);
 }
 
-async function discoverFromRoot(rootPath: string, since?: Date): Promise<DiscoveredClineTaskFile[]> {
+async function discoverFromRoot(
+  rootPath: string,
+  since?: Date,
+): Promise<DiscoveredClineTaskFile[]> {
   const tasksPath = join(rootPath, "tasks");
   const historyById = await readTaskHistory(rootPath);
   const discovered: DiscoveredClineTaskFile[] = [];
 
-  let entries;
+  let entries: Dirent[];
   try {
     entries = await readdir(tasksPath, { withFileTypes: true, encoding: "utf8" });
   } catch (error) {

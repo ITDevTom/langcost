@@ -11,17 +11,41 @@ export interface ClineUiMessage {
   say?: string;
   ask?: string;
   text?: string;
+  conversationHistoryIndex?: number;
   modelInfo?: ClineModelInfo;
   [key: string]: unknown;
 }
 
 export interface ClineApiRequestUsage {
+  source?: string;
   request?: string;
   tokensIn?: number;
   tokensOut?: number;
   cacheWrites?: number;
   cacheReads?: number;
   cost?: number;
+  [key: string]: unknown;
+}
+
+export interface ClineApiConversationMetrics {
+  tokens?: {
+    prompt?: number;
+    completion?: number;
+    cached?: number;
+    cacheWrites?: number;
+    cacheReads?: number;
+    [key: string]: unknown;
+  };
+  cost?: number;
+  [key: string]: unknown;
+}
+
+export interface ClineApiConversationMessage {
+  role?: string;
+  content?: unknown;
+  modelInfo?: ClineModelInfo;
+  metrics?: ClineApiConversationMetrics;
+  ts?: number;
   [key: string]: unknown;
 }
 
@@ -53,7 +77,7 @@ export interface ReadClineTaskResult {
   sourceFile: string;
   rootPath?: string;
   uiMessages: ClineUiMessage[];
-  apiConversationHistory?: unknown[];
+  apiConversationHistory?: ClineApiConversationMessage[];
   taskHistoryItem?: ClineTaskHistoryItem;
   lastOffset: number;
   lastLineHash?: string;

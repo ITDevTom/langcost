@@ -91,7 +91,10 @@ export const clineAdapter: IAdapter<Db> = {
 
       const discovered = await discoverTaskFiles(options);
       return discovered.length > 0
-        ? { ok: true, message: `Found ${discovered.length} Cline task files under ${resolved.root}` }
+        ? {
+            ok: true,
+            message: `Found ${discovered.length} Cline task files under ${resolved.root}`,
+          }
         : { ok: false, message: `No Cline task files found under ${resolved.root}` };
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown validation failure";

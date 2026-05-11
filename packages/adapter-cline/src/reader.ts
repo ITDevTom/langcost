@@ -3,7 +3,12 @@ import { basename, dirname, join } from "node:path";
 
 import { sha256 } from "@langcost/core";
 
-import type { ClineTaskHistoryItem, ClineUiMessage, ReadClineTaskResult } from "./types";
+import type {
+  ClineApiConversationMessage,
+  ClineTaskHistoryItem,
+  ClineUiMessage,
+  ReadClineTaskResult,
+} from "./types";
 
 function taskIdFromPath(filePath: string): string {
   return basename(dirname(filePath));
@@ -36,7 +41,8 @@ async function readJsonFile<T>(
 function normalizeHistoryItems(parsed: unknown): ClineTaskHistoryItem[] {
   if (Array.isArray(parsed)) return parsed as ClineTaskHistoryItem[];
   const maybeObject = parsed as { taskHistory?: unknown };
-  if (Array.isArray(maybeObject.taskHistory)) return maybeObject.taskHistory as ClineTaskHistoryItem[];
+  if (Array.isArray(maybeObject.taskHistory))
+    return maybeObject.taskHistory as ClineTaskHistoryItem[];
   return [];
 }
 
@@ -54,7 +60,7 @@ export async function readTaskFile(
     errors.push({ message: "ui_messages.json: expected top-level array" });
   }
 
-  const apiConversationHistory = await readJsonFile<unknown[]>(
+  const apiConversationHistory = await readJsonFile<ClineApiConversationMessage[]>(
     join(dirname(filePath), "api_conversation_history.json"),
     errors,
     "api_conversation_history.json",
