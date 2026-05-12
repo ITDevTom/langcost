@@ -23,7 +23,11 @@ export function findPricing(model: string): ModelPricing | undefined {
   });
 }
 
-export function calculateCost(model: string, inputTokens: number, outputTokens: number) {
+export function calculateCost(
+  model: string,
+  inputTokens: number,
+  outputTokens: number,
+): { inputCost: number; outputCost: number; totalCost: number } | null {
   validateTokenCount(inputTokens, "inputTokens");
   validateTokenCount(outputTokens, "outputTokens");
 
@@ -49,7 +53,13 @@ export function calculateCostWithCache(
   cacheCreationTokens: number,
   cacheReadTokens: number,
   cacheDuration: "5m" | "1h" = "1h",
-) {
+): {
+  inputCost: number;
+  outputCost: number;
+  cacheWriteCost: number;
+  cacheReadCost: number;
+  totalCost: number;
+} | null {
   validateTokenCount(inputTokens, "inputTokens");
   validateTokenCount(outputTokens, "outputTokens");
   validateTokenCount(cacheCreationTokens, "cacheCreationTokens");

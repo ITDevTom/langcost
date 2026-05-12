@@ -349,7 +349,7 @@ function WarpArbitrageSection({ trace }: { trace: TraceSummary }) {
         <div className="soft-card">
           <div className="text-xs text-slate-500">API-equivalent</div>
           <div className="mt-1 text-xl font-semibold text-slate-50">
-            {comparable ? formatUsd(apiCostUsd) : "-"}
+            {comparable ? formatUsd(apiCostUsd) : "—"}
           </div>
           {!comparable ? (
             <div className="mt-1 text-xs text-slate-500">model not yet priced</div>
@@ -369,7 +369,7 @@ function WarpArbitrageSection({ trace }: { trace: TraceSummary }) {
                 ) : null}
               </>
             ) : (
-              "-"
+              "—"
             )}
           </div>
         </div>
