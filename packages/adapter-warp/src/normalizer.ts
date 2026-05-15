@@ -42,15 +42,24 @@ function stripAnsiEscapes(text: string): string {
       // OSC — skip until BEL (0x07) or ST (ESC \)
       i += 2;
       while (i < text.length) {
-        if (text.charCodeAt(i) === 0x07) { i++; break; }
-        if (text.charCodeAt(i) === 0x1b && text[i + 1] === "\\") { i += 2; break; }
+        if (text.charCodeAt(i) === 0x07) {
+          i++;
+          break;
+        }
+        if (text.charCodeAt(i) === 0x1b && text[i + 1] === "\\") {
+          i += 2;
+          break;
+        }
         i++;
       }
     } else if (next === "P" || next === "^" || next === "_") {
       // DCS / PM / APC — skip until ST (ESC \)
       i += 2;
       while (i < text.length) {
-        if (text.charCodeAt(i) === 0x1b && text[i + 1] === "\\") { i += 2; break; }
+        if (text.charCodeAt(i) === 0x1b && text[i + 1] === "\\") {
+          i += 2;
+          break;
+        }
         i++;
       }
     } else {
@@ -63,7 +72,8 @@ function stripAnsiEscapes(text: string): string {
 
 function stripAnsi(bytes: Uint8Array | null): string {
   if (!bytes || bytes.length === 0) return "";
-  const capped = bytes.length > ANSI_BLOB_CAP_BYTES ? bytes.subarray(0, ANSI_BLOB_CAP_BYTES) : bytes;
+  const capped =
+    bytes.length > ANSI_BLOB_CAP_BYTES ? bytes.subarray(0, ANSI_BLOB_CAP_BYTES) : bytes;
   return stripAnsiEscapes(new TextDecoder().decode(capped));
 }
 
@@ -124,16 +134,28 @@ function totalTokensByKind(entries: WarpTokenUsageEntry[], kind: TokenKind): num
   return entries.reduce((sum, entry) => sum + tokensByKind(entry, kind), 0);
 }
 
-function calculateEquivalentApiCostUsd(entries: WarpTokenUsageEntry[], kind: TokenKind): number {
-  return entries.reduce((sum, entry) => {
+function calculateEquivalentApiCostUsd(
+  entries: WarpTokenUsageEntry[],
+  kind: TokenKind,
+): number | null {
+  let total = 0;
+
+  for (const entry of entries) {
     const tokenCount = tokensByKind(entry, kind);
     if (tokenCount <= 0) {
-      return sum;
+      continue;
     }
 
     const model = normalizeModelId(entry.model_id);
-    return sum + calculateCost(model, tokenCount, 0).totalCost;
-  }, 0);
+    const cost = calculateCost(model, tokenCount, 0);
+    if (!cost) {
+      return null;
+    }
+
+    total += cost.totalCost;
+  }
+
+  return total;
 }
 
 function resolveBillingMode(totalWarpTokens: number, totalByokTokens: number): WarpBillingMode {
@@ -224,9 +246,9 @@ export function normalizeConversation(
   const creditCostUsd = totalWarpTokens > 0 ? creditsSpent * effectiveCreditRateUsd : 0;
   const byokApiCostUsd = calculateEquivalentApiCostUsd(tokenUsage, "byok");
   const apiCostUsd = calculateEquivalentApiCostUsd(tokenUsage, "all");
-  const totalCostUsd = creditCostUsd + byokApiCostUsd;
+  const totalCostUsd = creditCostUsd + (byokApiCostUsd ?? 0);
   const costMarkupPct =
-    apiCostUsd > 0 ? ((totalCostUsd - apiCostUsd) / apiCostUsd) * 100 : null;
+    apiCostUsd !== null && apiCostUsd > 0 ? ((totalCostUsd - apiCostUsd) / apiCostUsd) * 100 : null;
   const billingMode = resolveBillingMode(totalWarpTokens, totalByokTokens);
 
   const tokenEstimates = estimateSpanTokens(exchanges, usageMeta);
@@ -256,7 +278,7 @@ export function normalizeConversation(
     const tokens = tokenEstimateMap.get(ex.exchange_id);
     const inputTokens = tokens?.inputTokens ?? 0;
     const outputTokens = tokens?.outputTokens ?? 0;
-    const costUsd = calculateCost(model, inputTokens, outputTokens).totalCost;
+    const costUsd = calculateCost(model, inputTokens, outputTokens)?.totalCost ?? null;
     const provider = findPricing(model)?.provider ?? null;
     if (outputStatus === "error") hasError = true;
     if (outputStatus === "partial") hasPartial = true;
@@ -377,8 +399,7 @@ export function normalizeConversation(
     }
   }
 
-  const startedAt =
-    parseTs(exchanges[0]?.start_ts) ?? parseTs(conv.last_modified_at) ?? new Date();
+  const startedAt = parseTs(exchanges[0]?.start_ts) ?? parseTs(conv.last_modified_at) ?? new Date();
   const endedAt = parseTs(conv.last_modified_at) ?? startedAt;
 
   const trace: TraceRecord = {

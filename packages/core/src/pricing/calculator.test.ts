@@ -11,6 +11,10 @@ describe("findPricing", () => {
     expect(findPricing("SONNET-4")?.model).toBe("claude-sonnet-4-20250514");
   });
 
+  it("matches Gemini 3 Pro aliases to the current canonical model", () => {
+    expect(findPricing("gemini-3-pro")?.model).toBe("gemini-3.1-pro-preview");
+  });
+
   it("distinguishes Opus 4.6 from Opus 4.0 pricing", () => {
     const opus46 = findPricing("claude-opus-4-6");
     const opus4 = findPricing("claude-opus-4");
@@ -29,12 +33,56 @@ describe("calculateCost", () => {
     });
   });
 
-  it("returns zero cost for unknown models", () => {
-    expect(calculateCost("unknown-model", 100, 200)).toEqual({
-      inputCost: 0,
-      outputCost: 0,
-      totalCost: 0,
+  it("calculates current GPT-5 family cost", () => {
+    expect(calculateCost("gpt-5.4", 1_000_000, 500_000)).toEqual({
+      inputCost: 2.5,
+      outputCost: 7.5,
+      totalCost: 10,
     });
+  });
+
+  it("calculates GPT-5.3 Codex standard cost", () => {
+    expect(calculateCost("gpt-5.3-codex", 1_000_000, 500_000)).toEqual({
+      inputCost: 1.75,
+      outputCost: 7,
+      totalCost: 8.75,
+    });
+  });
+
+  it("calculates GPT-5.3 Codex priority cost from high-reasoning alias", () => {
+    expect(calculateCost("gpt-5.3-codex-extra-high", 1_000_000, 500_000)).toEqual({
+      inputCost: 3.5,
+      outputCost: 14,
+      totalCost: 17.5,
+    });
+  });
+
+  it("calculates Gemini 3.1 Pro cost", () => {
+    expect(calculateCost("gemini-3.1-pro-preview", 1_000_000, 500_000)).toEqual({
+      inputCost: 2,
+      outputCost: 6,
+      totalCost: 8,
+    });
+  });
+
+  it("calculates Gemini 3 Flash cost", () => {
+    expect(calculateCost("gemini-3-flash-preview", 1_000_000, 500_000)).toEqual({
+      inputCost: 0.5,
+      outputCost: 1.5,
+      totalCost: 2,
+    });
+  });
+
+  it("calculates Gemini 2.5 Flash-Lite cost", () => {
+    const result = calculateCost("gemini-2.5-flash-lite", 1_000_000, 500_000);
+
+    expect(result?.inputCost).toBeCloseTo(0.1, 8);
+    expect(result?.outputCost).toBeCloseTo(0.2, 8);
+    expect(result?.totalCost).toBeCloseTo(0.3, 8);
+  });
+
+  it("returns null for unknown models", () => {
+    expect(calculateCost("unknown-model", 100, 200)).toBeNull();
   });
 });
 
@@ -49,11 +97,11 @@ describe("calculateCostWithCache", () => {
       1_000_000, // cache read
     );
 
-    expect(result.inputCost).toBeCloseTo(5, 2);
-    expect(result.outputCost).toBeCloseTo(25, 2);
-    expect(result.cacheWriteCost).toBeCloseTo(10, 2);
-    expect(result.cacheReadCost).toBeCloseTo(0.5, 2);
-    expect(result.totalCost).toBeCloseTo(40.5, 2);
+    expect(result?.inputCost).toBeCloseTo(5, 2);
+    expect(result?.outputCost).toBeCloseTo(25, 2);
+    expect(result?.cacheWriteCost).toBeCloseTo(10, 2);
+    expect(result?.cacheReadCost).toBeCloseTo(0.5, 2);
+    expect(result?.totalCost).toBeCloseTo(40.5, 2);
   });
 
   it("calculates cost with 5m cache for Opus 4.6", () => {
@@ -67,8 +115,8 @@ describe("calculateCostWithCache", () => {
       "5m",
     );
 
-    expect(result.cacheWriteCost).toBeCloseTo(6.25, 2);
-    expect(result.totalCost).toBeCloseTo(36.75, 2);
+    expect(result?.cacheWriteCost).toBeCloseTo(6.25, 2);
+    expect(result?.totalCost).toBeCloseTo(36.75, 2);
   });
 
   it("calculates cost with cache tokens for Sonnet", () => {
@@ -81,31 +129,23 @@ describe("calculateCostWithCache", () => {
       1_000_000,
     );
 
-    expect(result.inputCost).toBeCloseTo(3, 2);
-    expect(result.outputCost).toBeCloseTo(15, 2);
-    expect(result.cacheWriteCost).toBeCloseTo(6, 2);
-    expect(result.cacheReadCost).toBeCloseTo(0.3, 2);
-    expect(result.totalCost).toBeCloseTo(24.3, 2);
+    expect(result?.inputCost).toBeCloseTo(3, 2);
+    expect(result?.outputCost).toBeCloseTo(15, 2);
+    expect(result?.cacheWriteCost).toBeCloseTo(6, 2);
+    expect(result?.cacheReadCost).toBeCloseTo(0.3, 2);
+    expect(result?.totalCost).toBeCloseTo(24.3, 2);
   });
 
   it("handles zero cache tokens", () => {
     const result = calculateCostWithCache("claude-sonnet-4-6", 1000, 500, 0, 0);
 
-    expect(result.cacheWriteCost).toBe(0);
-    expect(result.cacheReadCost).toBe(0);
-    expect(result.totalCost).toBe(result.inputCost + result.outputCost);
+    expect(result?.cacheWriteCost).toBe(0);
+    expect(result?.cacheReadCost).toBe(0);
+    expect(result?.totalCost).toBe((result?.inputCost ?? 0) + (result?.outputCost ?? 0));
   });
 
-  it("returns all zeros for unknown models", () => {
-    const result = calculateCostWithCache("unknown-model", 1000, 500, 200, 300);
-
-    expect(result).toEqual({
-      inputCost: 0,
-      outputCost: 0,
-      cacheWriteCost: 0,
-      cacheReadCost: 0,
-      totalCost: 0,
-    });
+  it("returns null for unknown models", () => {
+    expect(calculateCostWithCache("unknown-model", 1000, 500, 200, 300)).toBeNull();
   });
 
   it("works with models that have no cache pricing", () => {
@@ -118,10 +158,10 @@ describe("calculateCostWithCache", () => {
       500_000,
     );
 
-    expect(result.inputCost).toBeCloseTo(2, 2);
-    expect(result.outputCost).toBeCloseTo(6, 2);
-    expect(result.cacheWriteCost).toBe(0);
-    expect(result.cacheReadCost).toBe(0);
+    expect(result?.inputCost).toBeCloseTo(2, 2);
+    expect(result?.outputCost).toBeCloseTo(6, 2);
+    expect(result?.cacheWriteCost).toBe(0);
+    expect(result?.cacheReadCost).toBe(0);
   });
 
   it("validates token counts are non-negative", () => {

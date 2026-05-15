@@ -184,9 +184,9 @@ function getUsageTotals(
     };
   }
 
-  const calculated = model ? calculateCost(model, inputTokens, outputTokens) : { totalCost: 0 };
+  const calculated = model ? calculateCost(model, inputTokens, outputTokens) : null;
   return {
-    costUsd: calculated.totalCost,
+    costUsd: calculated?.totalCost ?? null,
     estimated: !hasUsage || usage?.cost?.total === undefined,
   };
 }
@@ -327,7 +327,7 @@ export function normalizeSession(
 
       totalInputTokens += inputTokens;
       totalOutputTokens += outputTokens;
-      totalCostUsd += usageTotals.costUsd;
+      totalCostUsd += usageTotals.costUsd ?? 0;
 
       if (usageTotals.estimated) {
         isPartial = true;
