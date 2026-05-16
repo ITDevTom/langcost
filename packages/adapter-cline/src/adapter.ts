@@ -8,6 +8,7 @@ import {
   createMessageRepository,
   createSpanRepository,
   createTraceRepository,
+  getSqliteClient,
 } from "@langcost/db";
 
 import { discoverTaskFiles, resolveClineRoot } from "./discovery";
@@ -108,6 +109,7 @@ export const clineAdapter: IAdapter<Db> = {
     const spanRepository = createSpanRepository(db);
     const messageRepository = createMessageRepository(db);
     const ingestionRepository = createIngestionStateRepository(db);
+    const sqlite = getSqliteClient(db);
 
     const { discovered, skipped } = await filterAlreadyIngested(db, options);
     const errors: IngestResult["errors"] = [];
@@ -149,21 +151,25 @@ export const clineAdapter: IAdapter<Db> = {
         sessionId: task.taskId,
       });
 
-      traceRepository.upsert(normalized.trace);
-      for (const span of normalized.spans) {
-        spanRepository.upsert(span);
-      }
-      for (const message of normalized.messages) {
-        messageRepository.upsert(message);
-      }
-      ingestionRepository.upsert({
-        sourcePath: task.filePath,
-        adapter: "cline",
-        lastOffset: readResult.lastOffset,
-        lastLineHash: readResult.lastLineHash ?? null,
-        lastSessionId: task.taskId,
-        updatedAt: new Date(),
-      });
+      // Single transaction per task: keep the SQLite writer lock scoped to
+      // just this task's upserts so parallel scans have less time to collide.
+      sqlite.transaction(() => {
+        traceRepository.upsert(normalized.trace);
+        for (const span of normalized.spans) {
+          spanRepository.upsert(span);
+        }
+        for (const message of normalized.messages) {
+          messageRepository.upsert(message);
+        }
+        ingestionRepository.upsert({
+          sourcePath: task.filePath,
+          adapter: "cline",
+          lastOffset: readResult.lastOffset,
+          lastLineHash: readResult.lastLineHash ?? null,
+          lastSessionId: task.taskId,
+          updatedAt: new Date(),
+        });
+      })();
 
       tracesIngested += 1;
       spansIngested += normalized.spans.length;
