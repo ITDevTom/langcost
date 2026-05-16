@@ -5,6 +5,7 @@ import {
   createMessageRepository,
   createSpanRepository,
   createTraceRepository,
+  getSqliteClient,
 } from "@langcost/db";
 
 import { discoverWarpDb, validateSchema } from "./discovery";
@@ -64,6 +65,7 @@ export const warpAdapter: IAdapter<Db> = {
     const spanRepo = createSpanRepository(db);
     const messageRepo = createMessageRepository(db);
     const ingestionRepo = createIngestionStateRepository(db);
+    const sqlite = getSqliteClient(db);
 
     const rawData = readWarpData(dbPath, options?.since);
 
@@ -115,7 +117,7 @@ export const warpAdapter: IAdapter<Db> = {
       try {
         const exchanges = queriesByConv.get(conv.conversation_id) ?? [];
         const blocks = blocksByConv.get(conv.conversation_id) ?? [];
-        const warpPlan = options?.adapterOptions?.["warpPlan"] as string | undefined;
+        const warpPlan = options?.adapterOptions?.warpPlan as string | undefined;
         const normalized = normalizeConversation(
           conv,
           exchanges,
@@ -130,22 +132,26 @@ export const warpAdapter: IAdapter<Db> = {
           sessionId: conv.conversation_id,
         });
 
-        traceRepo.upsert(normalized.trace);
-        for (const span of normalized.spans) {
-          spanRepo.upsert(span);
-        }
-        for (const message of normalized.messages) {
-          messageRepo.upsert(message);
-        }
-
-        ingestionRepo.upsert({
-          sourcePath: stateKey,
-          adapter: "warp",
-          lastOffset: 0,
-          lastLineHash: null,
-          lastSessionId: conv.conversation_id,
-          updatedAt: new Date(),
-        });
+        // Single transaction per conversation: collapses hundreds of upserts into
+        // one short writer-lock hold, shrinking the window where another scan
+        // process can collide with us.
+        sqlite.transaction(() => {
+          traceRepo.upsert(normalized.trace);
+          for (const span of normalized.spans) {
+            spanRepo.upsert(span);
+          }
+          for (const message of normalized.messages) {
+            messageRepo.upsert(message);
+          }
+          ingestionRepo.upsert({
+            sourcePath: stateKey,
+            adapter: "warp",
+            lastOffset: 0,
+            lastLineHash: null,
+            lastSessionId: conv.conversation_id,
+            updatedAt: new Date(),
+          });
+        })();
 
         tracesIngested += 1;
         spansIngested += normalized.spans.length;

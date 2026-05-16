@@ -40,6 +40,17 @@ export interface IngestError {
 
 export interface IAdapter<Db = unknown> {
   readonly meta: AdapterMeta;
+  /**
+   * Ingest source data into langcost's normalized schema.
+   *
+   * Wrap each session's writes (trace + spans + messages + ingestion_state)
+   * in a single transaction using `getSqliteClient(db).transaction(() => { ... })()`
+   * from `@langcost/db`. This keeps the SQLite writer lock held for milliseconds
+   * instead of seconds, so concurrent `langcost scan` invocations don't collide.
+   * See `packages/adapter-warp/src/adapter.ts` for the canonical pattern.
+   *
+   * Should be idempotent — consult `ingestion_state` to skip already-ingested sessions.
+   */
   ingest(db: Db, options?: IngestOptions): Promise<IngestResult>;
   validate(options?: IngestOptions): Promise<{ ok: boolean; message: string }>;
 }

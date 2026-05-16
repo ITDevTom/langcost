@@ -1,5 +1,5 @@
-import { Database } from "bun:sqlite";
 import type { Database as BunDatabase } from "bun:sqlite";
+import { Database } from "bun:sqlite";
 import { afterEach, describe, expect, it } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -59,9 +59,7 @@ function createWarpFixture(options: WarpFixtureOptions = {}): string {
     outputStatus = '"Completed"',
     blockCount = 1,
     conversationCount = 1,
-    tokenUsage = [
-      { model_id: "Claude Sonnet 4.6", byok_tokens: 1000, category: "primary_agent" },
-    ],
+    tokenUsage = [{ model_id: "Claude Sonnet 4.6", byok_tokens: 1000, category: "primary_agent" }],
   } = options;
 
   const db = new Database(dbPath);
@@ -130,9 +128,7 @@ function createWarpFixture(options: WarpFixtureOptions = {}): string {
     const modifiedAt = `2026-03-20 10:0${c}:10`;
     insertConv.run(convId, JSON.stringify(convData), modifiedAt);
 
-    const exchangeInput = JSON.stringify([
-      { Query: { text: `Task ${c + 1}`, context: [] } },
-    ]);
+    const exchangeInput = JSON.stringify([{ Query: { text: `Task ${c + 1}`, context: [] } }]);
     insertQuery.run(
       `ex-${c + 1}`,
       convId,
@@ -231,7 +227,8 @@ describe("warpAdapter", () => {
 
       await warpAdapter.ingest(db, { sourcePath: dbPath });
 
-      const trace = createTraceRepository(db).list(1, 0)[0]!;
+      const [trace] = createTraceRepository(db).list(1, 0);
+      if (!trace) throw new Error("expected trace to be ingested");
       const toolSpans = createSpanRepository(db)
         .listByTraceId(trace.id)
         .filter((s) => s.type === "tool");
@@ -275,7 +272,8 @@ describe("warpAdapter", () => {
 
       await warpAdapter.ingest(db, { sourcePath: dbPath });
 
-      const trace = createTraceRepository(db).list(1, 0)[0]!;
+      const [trace] = createTraceRepository(db).list(1, 0);
+      if (!trace) throw new Error("expected trace to be ingested");
       const messages = createMessageRepository(db).listByTraceId(trace.id);
       const userMsg = messages.find((m) => m.role === "user");
 
@@ -338,7 +336,8 @@ describe("warpAdapter", () => {
 
       await warpAdapter.ingest(db, { sourcePath: dbPath });
 
-      const trace = createTraceRepository(db).list(1, 0)[0]!;
+      const [trace] = createTraceRepository(db).list(1, 0);
+      if (!trace) throw new Error("expected trace to be ingested");
       const llmSpan = createSpanRepository(db)
         .listByTraceId(trace.id)
         .find((s) => s.type === "llm");

@@ -67,10 +67,7 @@ export async function runConfiguredScan(
 ): Promise<ScanResultPayload> {
   return withDb(dbPath, async (db) => {
     const settingsRepository = createSettingsRepository(db);
-    const sourceConfig = requireSourceConfig(
-      settingsRepository.getSourceConfig(),
-      sourceOverride,
-    );
+    const sourceConfig = requireSourceConfig(settingsRepository.getSourceConfig(), sourceOverride);
     const adapter = await loadAdapter(sourceConfig.source);
 
     const validation = await adapter.validate(toAdapterOptions(sourceConfig));
