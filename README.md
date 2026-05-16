@@ -363,7 +363,7 @@ LangCost has a plugin architecture. Three ways to contribute:
 
 > **💲 Update model pricing** — edit `packages/core/src/pricing/providers.ts`. Add new models or fix outdated prices.
 
-> **🔌 Build an adapter** — create an npm package named `@langcost/adapter-<name>` implementing `IAdapter` from `@langcost/core`. The CLI discovers and loads it automatically — no registration needed.
+> **🔌 Build an adapter** — create an npm package named `@langcost/adapter-<name>` implementing `IAdapter` from `@langcost/core`. The CLI discovers and loads it automatically — no registration needed. Wrap per-session writes in `getSqliteClient(db).transaction(() => { ... })()` to keep the SQLite writer lock short; see `packages/adapter-warp/src/adapter.ts` for the canonical pattern.
 
 <br/>
 

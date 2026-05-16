@@ -23,8 +23,11 @@ export function createDb(path?: string): Db {
   ensureDbDirectory(dbPath);
 
   const sqlite = new Database(dbPath, { create: true });
-  sqlite.exec("PRAGMA journal_mode = WAL;");
-  sqlite.exec("PRAGMA foreign_keys = ON;");
+  sqlite.run("PRAGMA journal_mode = WAL;");
+  // Wait up to 5s for the writer lock instead of failing instantly with SQLITE_BUSY.
+  // Lets concurrent `langcost scan` invocations serialize cleanly.
+  sqlite.run("PRAGMA busy_timeout = 5000;");
+  sqlite.run("PRAGMA foreign_keys = ON;");
   return drizzle({ client: sqlite, schema });
 }
 

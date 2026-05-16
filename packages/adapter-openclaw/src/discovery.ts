@@ -6,7 +6,7 @@ import type { IngestOptions } from "@langcost/core";
 
 import type { DiscoveredSessionFile } from "./types";
 
-function candidateRoots(): string[] {
+function candidateRoots(): [string, ...string[]] {
   const home = process.env.HOME ?? ".";
   const xdgData = process.env.XDG_DATA_HOME ?? join(home, ".local", "share");
   return [
@@ -17,7 +17,7 @@ function candidateRoots(): string[] {
   ];
 }
 
-const DEFAULT_OPENCLAW_ROOT = candidateRoots()[0]!;
+const DEFAULT_OPENCLAW_ROOT = candidateRoots()[0];
 
 function expandHomePath(path: string): string {
   const home = process.env.HOME;

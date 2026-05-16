@@ -8,6 +8,7 @@ import {
   createMessageRepository,
   createSpanRepository,
   createTraceRepository,
+  getSqliteClient,
 } from "@langcost/db";
 
 import { discoverSessionFiles, resolveOpenClawRoot } from "./discovery";
@@ -108,6 +109,7 @@ export const openClawAdapter: IAdapter<Db> = {
     const spanRepository = createSpanRepository(db);
     const messageRepository = createMessageRepository(db);
     const ingestionRepository = createIngestionStateRepository(db);
+    const sqlite = getSqliteClient(db);
 
     const { discovered, skipped } = await filterAlreadyIngested(db, options);
     const errors: IngestResult["errors"] = [];
@@ -149,21 +151,25 @@ export const openClawAdapter: IAdapter<Db> = {
         sessionId: session.sessionId,
       });
 
-      traceRepository.upsert(normalized.trace);
-      for (const span of normalized.spans) {
-        spanRepository.upsert(span);
-      }
-      for (const message of normalized.messages) {
-        messageRepository.upsert(message);
-      }
-      ingestionRepository.upsert({
-        sourcePath: session.filePath,
-        adapter: "openclaw",
-        lastOffset: readResult.lastOffset,
-        lastLineHash: readResult.lastLineHash,
-        lastSessionId: session.sessionId,
-        updatedAt: new Date(),
-      });
+      // Single transaction per session: collapses hundreds of upserts into one
+      // short writer-lock hold, reducing collision odds with other scan processes.
+      sqlite.transaction(() => {
+        traceRepository.upsert(normalized.trace);
+        for (const span of normalized.spans) {
+          spanRepository.upsert(span);
+        }
+        for (const message of normalized.messages) {
+          messageRepository.upsert(message);
+        }
+        ingestionRepository.upsert({
+          sourcePath: session.filePath,
+          adapter: "openclaw",
+          lastOffset: readResult.lastOffset,
+          lastLineHash: readResult.lastLineHash,
+          lastSessionId: session.sessionId,
+          updatedAt: new Date(),
+        });
+      })();
 
       tracesIngested += 1;
       spansIngested += normalized.spans.length;
