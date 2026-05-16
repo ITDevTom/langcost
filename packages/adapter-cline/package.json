@@ -1,15 +1,19 @@
 {
   "name": "@langcost/adapter-cline",
-  "version": "0.1.0",
+  "version": "0.1.6",
   "type": "module",
   "publishConfig": {
     "access": "public"
   },
   "files": [
-    "src"
+    "dist"
   ],
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
   },
   "description": "Cline adapter for langcost - reads VS Code task history",
   "license": "AGPL-3.0",
@@ -19,6 +23,7 @@
     "directory": "packages/adapter-cline"
   },
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "test": "bun test"
   },
   "dependencies": {

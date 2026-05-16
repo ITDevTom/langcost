@@ -122,7 +122,9 @@ LangCost uses a plugin architecture — adapters translate agent-specific data i
 | **Claude Code** | `@langcost/adapter-claude-code` | `~/.claude/projects/` | JSONL session logs from the Claude Code CLI |
 | **OpenClaw** | `@langcost/adapter-openclaw` | `~/.openclaw/` | JSONL session logs from OpenClaw agents |
 | **Warp** | `@langcost/adapter-warp` | `~/Library/Group Containers/.../warp.sqlite` | Oz agent sessions from Warp's local SQLite database |
-| **Cline** | `@langcost/adapter-cline` | `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/` | VS Code extension task history from Cline; currently confirmed with OpenRouter-backed Cline usage |
+| **Cline** | `@langcost/adapter-cline` | `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/` | VS Code extension task history from Cline |
+
+Compatibility note: `@langcost/adapter-cline` reads Cline's stored task usage and preserves the provider/model recorded by Cline, including direct Cline model usage and OpenRouter-backed usage observed in local data.
 
 ```bash
 # Use multiple adapters — scan from different sources into the same DB

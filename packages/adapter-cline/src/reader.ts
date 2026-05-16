@@ -60,11 +60,18 @@ export async function readTaskFile(
     errors.push({ message: "ui_messages.json: expected top-level array" });
   }
 
-  const apiConversationHistory = await readJsonFile<ClineApiConversationMessage[]>(
+  const rawApiConversationHistory = await readJsonFile<unknown>(
     join(dirname(filePath), "api_conversation_history.json"),
     errors,
     "api_conversation_history.json",
   );
+  const apiConversationHistory = Array.isArray(rawApiConversationHistory)
+    ? (rawApiConversationHistory as ClineApiConversationMessage[])
+    : [];
+
+  if (rawApiConversationHistory !== undefined && !Array.isArray(rawApiConversationHistory)) {
+    errors.push({ message: "api_conversation_history.json: expected top-level array" });
+  }
 
   let taskHistoryItem: ClineTaskHistoryItem | undefined;
   if (rootPath) {
@@ -81,7 +88,7 @@ export async function readTaskFile(
     sourceFile: filePath,
     ...(rootPath ? { rootPath } : {}),
     uiMessages,
-    ...(apiConversationHistory ? { apiConversationHistory } : {}),
+    ...(rawApiConversationHistory !== undefined ? { apiConversationHistory } : {}),
     ...(taskHistoryItem ? { taskHistoryItem } : {}),
     lastOffset: stats.size,
     lastLineHash: await sha256(await Bun.file(filePath).text()),

@@ -8,6 +8,7 @@ type PackageInfo = {
   name: string;
   version: string;
   dependencies?: Record<string, string>;
+  scripts?: Record<string, string>;
 };
 
 type ReleasePackage = {
@@ -24,6 +25,7 @@ const packages: ReleasePackage[] = [
   { dir: "packages/analyzers", access: "public" },
   { dir: "packages/adapter-openclaw", access: "public" },
   { dir: "packages/adapter-claude-code", access: "public" },
+  { dir: "packages/adapter-cline", access: "public" },
   { dir: "packages/adapter-warp", access: "public" },
   { dir: "packages/cli", access: "public" },
 ];
@@ -102,6 +104,10 @@ async function main() {
 
     console.log(`\n=== Packing ${pkg.manifest.name}@${pkg.manifest.version} ===`);
     const packageDir = join(root, pkg.dir);
+    if (pkg.manifest.scripts?.build) {
+      console.log(`\n=== Building ${pkg.manifest.name}@${pkg.manifest.version} ===`);
+      run(["bun", "run", "build"], packageDir, "inherit");
+    }
     const packOutput = run(["bun", "pm", "pack"], packageDir);
     const tarballName = packOutput
       .split(/\r?\n/)

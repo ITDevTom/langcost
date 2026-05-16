@@ -43,6 +43,10 @@ async function filterAlreadyIngested(db: Db, options: IngestOptions | undefined)
   return { discovered: pending, skipped };
 }
 
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export const clineAdapter: IAdapter<Db> = {
   meta: {
     name: "cline",
@@ -125,55 +129,62 @@ export const clineAdapter: IAdapter<Db> = {
     });
 
     for (const [index, task] of discovered.entries()) {
-      options?.onProgress?.({
-        phase: "reading",
-        current: index + 1,
-        total: discovered.length,
-        sessionId: task.taskId,
-      });
-
-      const readResult = await readTaskFile(task.filePath, task.rootPath);
-
-      options?.onProgress?.({
-        phase: "normalizing",
-        current: index + 1,
-        total: discovered.length,
-        sessionId: task.taskId,
-      });
-
-      const normalized = normalizeTask(task, readResult);
-      errors.push(...normalized.errors);
-
-      options?.onProgress?.({
-        phase: "writing",
-        current: index + 1,
-        total: discovered.length,
-        sessionId: task.taskId,
-      });
-
-      // Single transaction per task: keep the SQLite writer lock scoped to
-      // just this task's upserts so parallel scans have less time to collide.
-      sqlite.transaction(() => {
-        traceRepository.upsert(normalized.trace);
-        for (const span of normalized.spans) {
-          spanRepository.upsert(span);
-        }
-        for (const message of normalized.messages) {
-          messageRepository.upsert(message);
-        }
-        ingestionRepository.upsert({
-          sourcePath: task.filePath,
-          adapter: "cline",
-          lastOffset: readResult.lastOffset,
-          lastLineHash: readResult.lastLineHash ?? null,
-          lastSessionId: task.taskId,
-          updatedAt: new Date(),
+      try {
+        options?.onProgress?.({
+          phase: "reading",
+          current: index + 1,
+          total: discovered.length,
+          sessionId: task.taskId,
         });
-      })();
 
-      tracesIngested += 1;
-      spansIngested += normalized.spans.length;
-      messagesIngested += normalized.messages.length;
+        const readResult = await readTaskFile(task.filePath, task.rootPath);
+
+        options?.onProgress?.({
+          phase: "normalizing",
+          current: index + 1,
+          total: discovered.length,
+          sessionId: task.taskId,
+        });
+
+        const normalized = normalizeTask(task, readResult);
+        errors.push(...normalized.errors);
+
+        options?.onProgress?.({
+          phase: "writing",
+          current: index + 1,
+          total: discovered.length,
+          sessionId: task.taskId,
+        });
+
+        // Single transaction per task: keep the SQLite writer lock scoped to
+        // just this task's upserts so parallel scans have less time to collide.
+        sqlite.transaction(() => {
+          traceRepository.upsert(normalized.trace);
+          for (const span of normalized.spans) {
+            spanRepository.upsert(span);
+          }
+          for (const message of normalized.messages) {
+            messageRepository.upsert(message);
+          }
+          ingestionRepository.upsert({
+            sourcePath: task.filePath,
+            adapter: "cline",
+            lastOffset: readResult.lastOffset,
+            lastLineHash: readResult.lastLineHash ?? null,
+            lastSessionId: task.taskId,
+            updatedAt: new Date(),
+          });
+        })();
+
+        tracesIngested += 1;
+        spansIngested += normalized.spans.length;
+        messagesIngested += normalized.messages.length;
+      } catch (error) {
+        errors.push({
+          file: task.filePath,
+          message: `Failed to ingest Cline task ${task.taskId} at ${task.filePath}: ${errorMessage(error)}`,
+        });
+      }
     }
 
     return {
