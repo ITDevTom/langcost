@@ -76,6 +76,46 @@ describe("@langcost/api", () => {
     expect(health.traceLimit).toBe(500);
   });
 
+  it("lists known adapters with installed status, version, and install commands", async () => {
+    const app = createApiApp({ dbPath: createTempDbPath() });
+
+    const response = await app.request("/api/v1/adapters");
+    expect(response.status).toBe(200);
+
+    type AdapterEntry =
+      | { name: string; label: string; installed: true; version: string }
+      | { name: string; label: string; installed: false; installCommand: string };
+
+    const payload = await readJson<{ adapters: AdapterEntry[] }>(response);
+
+    const names = payload.adapters.map((entry) => entry.name).sort();
+    expect(names).toEqual(["claude-code", "openclaw", "warp"]);
+
+    const labelByName = Object.fromEntries(
+      payload.adapters.map((entry) => [entry.name, entry.label]),
+    );
+    expect(labelByName).toEqual({
+      openclaw: "OpenClaw",
+      "claude-code": "Claude Code",
+      warp: "Warp",
+    });
+
+    for (const entry of payload.adapters) {
+      if (entry.installed) {
+        expect(typeof entry.version).toBe("string");
+        expect(entry.version.length).toBeGreaterThan(0);
+        expect("installCommand" in entry).toBe(false);
+      } else {
+        expect(entry.installCommand).toBe(`npm install -g @langcost/adapter-${entry.name}`);
+        expect("version" in entry).toBe(false);
+      }
+    }
+
+    // In the workspace dev environment every known adapter resolves via the
+    // workspace fallback in tryLoadAdapter, so all three should report installed.
+    expect(payload.adapters.every((entry) => entry.installed)).toBe(true);
+  });
+
   it("returns a friendly error when a scan is triggered before settings are saved", async () => {
     const app = createApiApp({ dbPath: createTempDbPath() });
 
