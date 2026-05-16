@@ -7,6 +7,7 @@ import {
   createWasteReportRepository,
   getSqliteClient,
   migrate,
+  resolveDbPath,
   type TraceRecord,
   type WasteReportRecord,
 } from "@langcost/db";
@@ -15,6 +16,7 @@ import { loadAdapter } from "../adapter-loader";
 import { MAX_TRACES_OSS } from "../config";
 import { createPalette } from "../output/colors";
 import { formatCurrency, formatPercent, pluralize, renderTree } from "../output/summary";
+import { acquireScanLock } from "../scan-lock";
 import type { CliRuntime, ScanCommandOptions } from "../types";
 
 function isActionableWaste(report: WasteReportRecord): boolean {
@@ -113,6 +115,17 @@ export async function runScanCommand(
   runtime: CliRuntime,
 ): Promise<number> {
   const palette = createPalette(runtime.io);
+  const dbPath = resolveDbPath(options.dbPath);
+
+  let lock: Awaited<ReturnType<typeof acquireScanLock>>;
+  try {
+    lock = await acquireScanLock(dbPath, runtime.io);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to acquire scan lock";
+    runtime.io.error(`${palette.red("Error:")} ${message}\n`);
+    return 1;
+  }
+
   const db = createDb(options.dbPath);
   const commandStartedAt = runtime.now();
 
@@ -201,5 +214,6 @@ export async function runScanCommand(
     return 1;
   } finally {
     getSqliteClient(db).close(false);
+    lock.release();
   }
 }

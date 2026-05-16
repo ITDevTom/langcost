@@ -139,7 +139,6 @@ export function Overview({ refreshToken, onNavigate, source, billingMode }: Over
 
       <WarpArbitrageCard arbitrage={overview.warpArbitrage} />
 
-
       {overview.byProject?.length > 0 ? (
         <section className="panel p-5">
           <div className="mb-4">

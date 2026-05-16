@@ -7,6 +7,7 @@ import {
   createMessageRepository,
   createSpanRepository,
   createTraceRepository,
+  getSqliteClient,
 } from "@langcost/db";
 
 import { discoverConversationFiles, getProjectsRoot } from "./discovery";
@@ -107,6 +108,7 @@ export const claudeCodeAdapter: IAdapter<Db> = {
     const spanRepository = createSpanRepository(db);
     const messageRepository = createMessageRepository(db);
     const ingestionRepository = createIngestionStateRepository(db);
+    const sqlite = getSqliteClient(db);
 
     const { discovered, skipped } = await filterAlreadyIngested(db, options);
     const errors: IngestResult["errors"] = [];
@@ -148,21 +150,26 @@ export const claudeCodeAdapter: IAdapter<Db> = {
         sessionId: conversation.conversationId,
       });
 
-      traceRepository.upsert(normalized.trace);
-      for (const span of normalized.spans) {
-        spanRepository.upsert(span);
-      }
-      for (const message of normalized.messages) {
-        messageRepository.upsert(message);
-      }
-      ingestionRepository.upsert({
-        sourcePath: conversation.filePath,
-        adapter: "claude-code",
-        lastOffset: readResult.lastOffset,
-        lastLineHash: readResult.lastLineHash,
-        lastSessionId: conversation.conversationId,
-        updatedAt: new Date(),
-      });
+      // Single transaction per conversation: collapses hundreds of upserts into
+      // one short writer-lock hold, reducing collision odds with other scan
+      // processes.
+      sqlite.transaction(() => {
+        traceRepository.upsert(normalized.trace);
+        for (const span of normalized.spans) {
+          spanRepository.upsert(span);
+        }
+        for (const message of normalized.messages) {
+          messageRepository.upsert(message);
+        }
+        ingestionRepository.upsert({
+          sourcePath: conversation.filePath,
+          adapter: "claude-code",
+          lastOffset: readResult.lastOffset,
+          lastLineHash: readResult.lastLineHash,
+          lastSessionId: conversation.conversationId,
+          updatedAt: new Date(),
+        });
+      })();
 
       tracesIngested += 1;
       spansIngested += normalized.spans.length;

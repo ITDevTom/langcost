@@ -1,65 +1,37 @@
 {
   "version": 1,
   "stack": {
-    "detected": [
-      "generic",
-      "react",
-      "drizzle"
-    ],
-    "enabled": [
-      "generic",
-      "react",
-      "drizzle"
-    ],
+    "detected": ["generic", "react", "drizzle"],
+    "enabled": ["generic", "react", "drizzle"],
     "disabled": []
   },
   "workspaces": {
     "apps/api": {
-      "adapters": [
-        "generic"
-      ]
+      "adapters": ["generic"]
     },
     "apps/web": {
-      "adapters": [
-        "react",
-        "generic"
-      ]
+      "adapters": ["react", "generic"]
     },
     "packages/adapter-claude-code": {
-      "adapters": [
-        "generic"
-      ]
+      "adapters": ["generic"]
     },
     "packages/adapter-openclaw": {
-      "adapters": [
-        "generic"
-      ]
+      "adapters": ["generic"]
     },
     "packages/adapter-warp": {
-      "adapters": [
-        "generic"
-      ]
+      "adapters": ["generic"]
     },
     "packages/analyzers": {
-      "adapters": [
-        "generic"
-      ]
+      "adapters": ["generic"]
     },
     "packages/cli": {
-      "adapters": [
-        "generic"
-      ]
+      "adapters": ["generic"]
     },
     "packages/core": {
-      "adapters": [
-        "generic"
-      ]
+      "adapters": ["generic"]
     },
     "packages/db": {
-      "adapters": [
-        "drizzle",
-        "generic"
-      ]
+      "adapters": ["drizzle", "generic"]
     }
   },
   "customBoundaries": [
@@ -185,7 +157,7 @@
     "excludeTypeOnlyImports": true
   },
   "_meta": {
-    "generatedAt": "2026-05-06T19:01:19.211Z",
+    "generatedAt": "2026-05-10T06:09:18.681Z",
     "lastModifiedBy": "kk_init",
     "projectName": "langcost"
   },

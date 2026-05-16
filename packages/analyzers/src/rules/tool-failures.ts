@@ -14,7 +14,11 @@ function getCommandFirstToken(toolInput: string | null | undefined): string | nu
   let command = toolInput;
   try {
     const parsed = JSON.parse(toolInput);
-    if (parsed && typeof parsed === "object" && typeof (parsed as { command?: unknown }).command === "string") {
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof (parsed as { command?: unknown }).command === "string"
+    ) {
       command = (parsed as { command: string }).command;
     }
   } catch {}

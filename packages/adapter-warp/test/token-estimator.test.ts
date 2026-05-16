@@ -52,10 +52,7 @@ describe("estimateSpanTokens", () => {
     });
 
     it("returns zero tokens when there are no primary_agent tokens", () => {
-      const result = estimateSpanTokens(
-        [anExchange("ex-1")],
-        withFullTerminalUseTokens(1000),
-      );
+      const result = estimateSpanTokens([anExchange("ex-1")], withFullTerminalUseTokens(1000));
 
       expect(result[0]?.inputTokens).toBe(0);
       expect(result[0]?.outputTokens).toBe(0);
@@ -71,10 +68,7 @@ describe("estimateSpanTokens", () => {
 
   describe("primary_agent filtering", () => {
     it("includes primary_agent byok tokens in normalisation denominator", () => {
-      const result = estimateSpanTokens(
-        [anExchange("ex-1", 100)],
-        withPrimaryAgentTokens(400),
-      );
+      const result = estimateSpanTokens([anExchange("ex-1", 100)], withPrimaryAgentTokens(400));
 
       expect((result[0]?.inputTokens ?? 0) + (result[0]?.outputTokens ?? 0)).toBe(400);
     });
@@ -138,11 +132,7 @@ describe("estimateSpanTokens", () => {
     });
 
     it("all span totals sum to the primary_agent token total", () => {
-      const exchanges = [
-        anExchange("ex-1", 100),
-        anExchange("ex-2", 200),
-        anExchange("ex-3", 150),
-      ];
+      const exchanges = [anExchange("ex-1", 100), anExchange("ex-2", 200), anExchange("ex-3", 150)];
       const agentTotal = 1200;
       const result = estimateSpanTokens(exchanges, withPrimaryAgentTokens(agentTotal));
 
@@ -154,10 +144,7 @@ describe("estimateSpanTokens", () => {
 
   describe("input / output split", () => {
     it("all scaled tokens go to inputTokens; outputTokens is 0 (output split unavailable)", () => {
-      const result = estimateSpanTokens(
-        [anExchange("ex-1", 100)],
-        withPrimaryAgentTokens(1000),
-      );
+      const result = estimateSpanTokens([anExchange("ex-1", 100)], withPrimaryAgentTokens(1000));
 
       expect(result[0]?.outputTokens).toBe(0);
       expect(result[0]?.inputTokens).toBe(1000);

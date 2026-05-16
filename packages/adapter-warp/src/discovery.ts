@@ -64,9 +64,7 @@ export function validateSchema(dbPath: string): SchemaValidationResult {
 }
 
 export async function discoverWarpDb(sourcePath?: string): Promise<string | null> {
-  const candidates = sourcePath
-    ? [sourcePath]
-    : [defaultWarpDbPath(), previewWarpDbPath()];
+  const candidates = sourcePath ? [sourcePath] : [defaultWarpDbPath(), previewWarpDbPath()];
 
   for (const candidate of candidates) {
     try {

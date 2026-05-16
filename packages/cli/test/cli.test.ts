@@ -178,9 +178,9 @@ describe("langcost", () => {
   });
 
   it("rejects invalid --warp-plan values", () => {
-    expect(() =>
-      parseArgv(["scan", "--source", "warp", "--warp-plan", "not-a-plan"]),
-    ).toThrow("Invalid --warp-plan value: not-a-plan");
+    expect(() => parseArgv(["scan", "--source", "warp", "--warp-plan", "not-a-plan"])).toThrow(
+      "Invalid --warp-plan value: not-a-plan",
+    );
   });
 
   it("returns a friendly error when an adapter is missing", async () => {
