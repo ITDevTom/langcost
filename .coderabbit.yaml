@@ -1,0 +1,66 @@
+# CodeRabbit configuration — https://docs.coderabbit.ai/getting-started/configure-coderabbit
+# Auto-reviews every PR against main and flags bugs, architecture concerns,
+# and missing tests. Formatting is handled by Biome (CI), so CodeRabbit skips
+# style nitpicks here.
+
+language: en-US
+tone_instructions: Be concise and pragmatic. Focus on bugs, architecture drift, and missing tests. Skip formatting and style nits — Biome handles those.
+early_access: false
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: false
+  collapse_walkthrough: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - main
+
+  path_filters:
+    - "!packages/cli/dashboard/**"
+    - "!**/dist/**"
+    - "!bun.lock"
+    - "!*.lockb"
+    - "!**/*.snap"
+
+  path_instructions:
+    - path: "packages/analyzers/**"
+      instructions: |
+        Analyzers must stay source-agnostic. Flag any import from `@langcost/adapter-*`
+        or any reference to source-specific shapes — analyzers only read normalized
+        Traces/Spans/Messages from SQLite. See packages/analyzers/CLAUDE.md.
+    - path: "packages/cli/src/**"
+      instructions: |
+        Adapters are plugins loaded dynamically. Flag any static import like
+        `import x from "@langcost/adapter-foo"` — the only allowed loading path is
+        `loadAdapter("<name>")` which uses `import()` at runtime.
+    - path: "packages/core/**"
+      instructions: |
+        `@langcost/core` must stay zero-dependency. Flag any non-relative import
+        (no imports of `@langcost/db`, adapters, analyzers, CLI, or app packages;
+        no third-party deps). See packages/core/CLAUDE.md.
+    - path: "packages/adapter-*/src/**"
+      instructions: |
+        Adapters must wrap each session's writes (trace + spans + messages +
+        ingestion_state upserts) in a single transaction via
+        `getSqliteClient(db).transaction(() => { ... })()` from `@langcost/db`.
+        This is the scan-lock contract (issue #23). Flag adapters that write
+        outside a transaction.
+    - path: "apps/api/src/routes/**"
+      instructions: |
+        All API endpoints live under /api/v1/. Route handlers read and write
+        application data through `@langcost/db` repositories, not by reaching
+        into adapters or raw SQL.
+    - path: "apps/web/**"
+      instructions: |
+        Talk to the backend only through `src/api/client.ts`. Use plain React
+        state and small focused components — no component library, no React
+        Router. Follow UI.md for layout and palette.
+
+chat:
+  auto_reply: true
