@@ -2,6 +2,7 @@
 
 import { runDashboardCommand } from "./commands/dashboard";
 import { runReportCommand } from "./commands/report";
+import { runRulesCommand } from "./commands/rules";
 import { runScanCommand } from "./commands/scan";
 import { runStatusCommand } from "./commands/status";
 import { getHelpText, parseArgv } from "./config";
@@ -44,6 +45,8 @@ export async function main(
         return runReportCommand(command, runtime);
       case "status":
         return runStatusCommand(command, runtime);
+      case "rules":
+        return runRulesCommand(command, runtime);
       case "dashboard":
         return runDashboardCommand(command, runtime);
       default:

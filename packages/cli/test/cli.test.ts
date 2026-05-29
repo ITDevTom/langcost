@@ -4,10 +4,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { allRulesEnabledConfig } from "@langcost/analyzers";
 import {
   createDb,
   createSettingsRepository,
   createTraceRepository,
+  createWasteReportRepository,
   getSqliteClient,
   migrate,
 } from "@langcost/db";
@@ -305,6 +307,13 @@ describe("langcost", () => {
     const dbPath = createTempDbPath();
     const fixture = join(process.cwd(), "fixtures", "openclaw", "model-overuse-session.jsonl");
 
+    // Strict opt-in: enable rules so model_overuse is actually detected, then assert the scan
+    // summary still excludes it from waste totals.
+    const seedDb = createDb(dbPath);
+    migrate(seedDb);
+    createSettingsRepository(seedDb).setRulesConfig(allRulesEnabledConfig());
+    getSqliteClient(seedDb).close(false);
+
     const exitCode = await main(
       ["scan", "--source", "openclaw", "--file", fixture, "--db", dbPath],
       runtime,
@@ -313,6 +322,78 @@ describe("langcost", () => {
     expect(exitCode).toBe(0);
     expect(stderr.join("")).toBe("");
     expect(stdout.join("")).not.toContain("model_overuse");
+  });
+
+  it("rules list shows the catalog and an opt-in hint when nothing is enabled", async () => {
+    const dbPath = createTempDbPath();
+    const { stdout, runtime } = createBufferRuntime();
+
+    const exitCode = await main(["rules", "list", "--db", dbPath], runtime);
+
+    expect(exitCode).toBe(0);
+    const output = stdout.join("");
+    expect(output).toContain("low-cache");
+    expect(output).toContain("model-overuse");
+    expect(output).toContain("No rules enabled");
+  });
+
+  it("rules enable turns a rule on and re-analyzes stored traces", async () => {
+    const dbPath = createTempDbPath();
+    const fixture = join(process.cwd(), "fixtures", "openclaw", "model-overuse-session.jsonl");
+    const setupRuntime = createBufferRuntime();
+    await main(
+      ["scan", "--source", "openclaw", "--file", fixture, "--db", dbPath],
+      setupRuntime.runtime,
+    );
+
+    const { stdout, runtime } = createBufferRuntime();
+    const exitCode = await main(["rules", "enable", "model-overuse", "--db", dbPath], runtime);
+
+    expect(exitCode).toBe(0);
+    expect(stdout.join("")).toContain('Enabled "model-overuse"');
+
+    const db = createDb(dbPath);
+    const reports = createWasteReportRepository(db).list();
+    getSqliteClient(db).close(false);
+    expect(reports.some((report) => report.category === "model_overuse")).toBe(true);
+  });
+
+  it("rules enable rejects an unknown rule id", async () => {
+    const { stderr, runtime } = createBufferRuntime();
+    const exitCode = await main(
+      ["rules", "enable", "not-a-rule", "--db", createTempDbPath()],
+      runtime,
+    );
+
+    expect(exitCode).toBe(1);
+    expect(stderr.join("")).toContain('unknown rule "not-a-rule"');
+  });
+
+  it("rules scope restricts a rule to specific adapters", async () => {
+    const dbPath = createTempDbPath();
+    const fixture = join(process.cwd(), "fixtures", "openclaw", "model-overuse-session.jsonl");
+    const setupRuntime = createBufferRuntime();
+    await main(
+      ["scan", "--source", "openclaw", "--file", fixture, "--db", dbPath],
+      setupRuntime.runtime,
+    );
+
+    // Scope model-overuse to a different adapter -> no findings on the openclaw trace.
+    const scopeRuntime = createBufferRuntime();
+    const scopeCode = await main(
+      ["rules", "scope", "model-overuse", "warp", "--db", dbPath],
+      scopeRuntime.runtime,
+    );
+    expect(scopeCode).toBe(0);
+
+    const db = createDb(dbPath);
+    const reports = createWasteReportRepository(db).list();
+    getSqliteClient(db).close(false);
+    expect(reports.some((report) => report.category === "model_overuse")).toBe(false);
+
+    const { stdout, runtime } = createBufferRuntime();
+    await main(["rules", "list", "--db", dbPath], runtime);
+    expect(stdout.join("")).toContain("warp");
   });
 
   it("starts the dashboard, auto-scans configured data, and opens the browser URL", async () => {

@@ -3,13 +3,15 @@ import type { Db } from "@langcost/db";
 import {
   createMessageRepository,
   createSegmentRepository,
+  createSettingsRepository,
   createSpanRepository,
   createTraceRepository,
   createWasteReportRepository,
 } from "@langcost/db";
 
 import { buildTraceContext, type TraceAnalysisContext } from "./context";
-import { tier1Rules } from "./rules";
+import { resolveRules } from "./rules/registry";
+import { satisfiesRequirements } from "./rules/requirements";
 
 function toTraceListOptions(options?: AnalyzeOptions) {
   return {
@@ -22,7 +24,7 @@ export const wasteDetector: IAnalyzer<Db> = {
   meta: {
     name: "waste-detector",
     version: "0.0.1",
-    description: "Runs Tier 1 waste detection rules against normalized traces.",
+    description: "Runs the user-enabled waste detection rules against normalized traces.",
     priority: 20,
   },
 
@@ -48,7 +50,19 @@ export const wasteDetector: IAnalyzer<Db> = {
       options?.onProgress?.({ current: index + 1, total: traces.length });
     }
 
-    const reports = tier1Rules.flatMap((rule) => rule.detect(contexts));
+    // Strict opt-in: only rules the user has enabled in `rules_config` run. An absent config
+    // yields an empty active set, so a fresh install detects no waste until rules are chosen.
+    const rulesConfig = createSettingsRepository(db).getRulesConfig();
+    const activeRules = resolveRules(rulesConfig);
+
+    const reports = activeRules.flatMap(({ rule, resolved, sources }) => {
+      const scoped =
+        sources === "*"
+          ? contexts
+          : contexts.filter((context) => sources.includes(context.trace.source));
+      const eligible = scoped.filter((context) => satisfiesRequirements(context, rule.requires));
+      return rule.detect(eligible, resolved);
+    });
     for (const report of reports) {
       wasteReportRepository.upsert(report);
     }

@@ -6,8 +6,12 @@ import { createWasteReport, severityFromCost } from "./shared";
 import type { WasteRule } from "./types";
 
 export const lowCacheRule: WasteRule = {
-  name: "low-cache",
+  id: "low-cache",
   tier: 1,
+  title: "Low cache utilization",
+  description: "Prompt caching stayed below 10% on cacheable LLM spans.",
+  defaultEnabled: true,
+  requires: ["cacheTokens"],
   detect(contexts): WasteReportRecord[] {
     return contexts.flatMap((context) => {
       const eligibleSpans = context.llmSpans

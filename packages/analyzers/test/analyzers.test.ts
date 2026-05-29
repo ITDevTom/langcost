@@ -8,6 +8,7 @@ import {
   createAnalysisRunRepository,
   createDb,
   createSegmentRepository,
+  createSettingsRepository,
   createTraceRepository,
   createWasteReportRepository,
   getSqliteClient,
@@ -15,7 +16,11 @@ import {
 } from "@langcost/db";
 
 import { openClawAdapter } from "../../adapter-openclaw/src/index";
-import { costAnalyzer, runPipeline, wasteDetector } from "../src/index";
+import { allRulesEnabledConfig, costAnalyzer, runPipeline, wasteDetector } from "../src/index";
+
+function enableAllRules(db: ReturnType<typeof createDb>) {
+  createSettingsRepository(db).setRulesConfig(allRulesEnabledConfig());
+}
 
 const cleanupPaths: string[] = [];
 const cleanupDatabases: Database[] = [];
@@ -98,6 +103,7 @@ describe("@langcost/analyzers", () => {
     const db = createTempDb();
     const trace = await ingestFixture(db, "expensive-session.jsonl");
 
+    enableAllRules(db);
     await wasteDetector.analyze(db, { traceIds: [trace.id] });
 
     const reports = createWasteReportRepository(db).listByTraceId(trace.id);
@@ -108,6 +114,7 @@ describe("@langcost/analyzers", () => {
     const db = createTempDb();
     const trace = await ingestFixture(db, "model-overuse-session.jsonl");
 
+    enableAllRules(db);
     await wasteDetector.analyze(db, { traceIds: [trace.id] });
 
     const reports = createWasteReportRepository(db).listByTraceId(trace.id);
@@ -118,6 +125,7 @@ describe("@langcost/analyzers", () => {
     const db = createTempDb();
     const trace = await ingestFixture(db, "agent-loop.jsonl");
 
+    enableAllRules(db);
     await wasteDetector.analyze(db, { traceIds: [trace.id] });
 
     const reports = createWasteReportRepository(db).listByTraceId(trace.id);
@@ -128,6 +136,7 @@ describe("@langcost/analyzers", () => {
     const db = createTempDb();
     const trace = await ingestFixture(db, "retry-session.jsonl");
 
+    enableAllRules(db);
     await wasteDetector.analyze(db, { traceIds: [trace.id] });
 
     const reports = createWasteReportRepository(db).listByTraceId(trace.id);
@@ -138,6 +147,7 @@ describe("@langcost/analyzers", () => {
     const db = createTempDb();
     const trace = await ingestFixture(db, "tool-heavy.jsonl");
 
+    enableAllRules(db);
     await wasteDetector.analyze(db, { traceIds: [trace.id] });
 
     const reports = createWasteReportRepository(db).listByTraceId(trace.id);
@@ -148,10 +158,45 @@ describe("@langcost/analyzers", () => {
     const db = createTempDb();
     const trace = await ingestFixture(db, "high-output-session.jsonl");
 
+    enableAllRules(db);
     await wasteDetector.analyze(db, { traceIds: [trace.id] });
 
     const reports = createWasteReportRepository(db).listByTraceId(trace.id);
     expect(reports.some((report) => report.category === "high_output")).toBe(true);
+  });
+
+  it("runs no rules and writes no waste reports when rules_config is absent (strict opt-in)", async () => {
+    const db = createTempDb();
+    const trace = await ingestFixture(db, "expensive-session.jsonl");
+
+    const result = await wasteDetector.analyze(db, { traceIds: [trace.id] });
+
+    expect(result.findingsCount).toBe(0);
+    expect(createWasteReportRepository(db).listByTraceId(trace.id)).toHaveLength(0);
+  });
+
+  it("only runs a rule against the adapters it is scoped to", async () => {
+    const db = createTempDb();
+    const trace = await ingestFixture(db, "expensive-session.jsonl"); // source = openclaw
+
+    const hasLowCache = () =>
+      createWasteReportRepository(db)
+        .listByTraceId(trace.id)
+        .some((report) => report.category === "low_cache_utilization");
+
+    // Scoped to a different adapter -> low-cache must not run on this openclaw trace.
+    createSettingsRepository(db).setRulesConfig({
+      rules: { "low-cache": { enabled: true, sources: ["langfuse"] } },
+    });
+    await wasteDetector.analyze(db, { traceIds: [trace.id] });
+    expect(hasLowCache()).toBe(false);
+
+    // Re-scope to openclaw -> low-cache now runs against this trace.
+    createSettingsRepository(db).setRulesConfig({
+      rules: { "low-cache": { enabled: true, sources: ["openclaw"] } },
+    });
+    await wasteDetector.analyze(db, { traceIds: [trace.id] });
+    expect(hasLowCache()).toBe(true);
   });
 
   it("runs analyzers in priority order and records analysis_runs", async () => {

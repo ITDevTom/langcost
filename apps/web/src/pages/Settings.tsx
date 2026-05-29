@@ -3,9 +3,14 @@ import { useCallback, useEffect, useState } from "react";
 import {
   type AdapterStatus,
   getAdapters,
+  getRules,
   type InstalledAdapter,
   installAdapter,
   type MissingAdapter,
+  type RuleCatalogEntry,
+  type RuleConfigEntry,
+  type RulesConfig,
+  saveRules,
   triggerScan,
   uninstallAdapter,
 } from "../api/client";
@@ -28,24 +33,80 @@ const INITIAL_ROW_STATE: RowState = { action: "idle", message: null, error: null
 const REPO_URL = "https://github.com/vjvkrm/langcost";
 const ADAPTERS_DIR_URL = `${REPO_URL}/tree/main/packages`;
 
+/** Whether a rule (with its persisted scope) currently applies to a given adapter. */
+function ruleAppliesToAdapter(entry: RuleConfigEntry | undefined, adapterName: string): boolean {
+  if (!entry?.enabled) {
+    return false;
+  }
+  return entry.sources === "*" || entry.sources.includes(adapterName);
+}
+
+/**
+ * Toggle a rule on/off for a single adapter, editing the shared rules config adapter-first.
+ * A `"*"` scope is expanded to the concrete adapter set before toggling, so unchecking one adapter
+ * leaves the rule applied to the rest (rather than all-or-nothing).
+ */
+function toggleRuleForAdapter(
+  config: RulesConfig,
+  ruleId: string,
+  adapterName: string,
+  allAdapterNames: string[],
+): RulesConfig {
+  const entry = config.rules[ruleId];
+
+  let scope: Set<string>;
+  if (!entry?.enabled) {
+    scope = new Set();
+  } else if (entry.sources === "*") {
+    scope = new Set(allAdapterNames);
+  } else {
+    scope = new Set(entry.sources);
+  }
+
+  if (scope.has(adapterName)) {
+    scope.delete(adapterName);
+  } else {
+    scope.add(adapterName);
+  }
+
+  const next: RuleConfigEntry = {
+    enabled: scope.size > 0,
+    sources: [...scope],
+    ...(entry?.thresholds ? { thresholds: entry.thresholds } : {}),
+  };
+
+  return { rules: { ...config.rules, [ruleId]: next } };
+}
+
 export function Settings({ onShellRefresh }: SettingsProps) {
   const [adapters, setAdapters] = useState<AdapterStatus[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [rowState, setRowState] = useState<Record<string, RowState>>({});
 
-  const loadAdapters = useCallback(async () => {
+  const [rulesCatalog, setRulesCatalog] = useState<RuleCatalogEntry[]>([]);
+  const [rulesConfig, setRulesConfig] = useState<RulesConfig>({ rules: {} });
+  const [rulesDirty, setRulesDirty] = useState(false);
+  const [savingRules, setSavingRules] = useState(false);
+  const [rulesMessage, setRulesMessage] = useState<string | null>(null);
+  const [rulesError, setRulesError] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const loadAll = useCallback(async () => {
     setListError(null);
     try {
-      const response = await getAdapters();
-      setAdapters(response.adapters);
+      const [adaptersResponse, rulesResponse] = await Promise.all([getAdapters(), getRules()]);
+      setAdapters(adaptersResponse.adapters);
+      setRulesCatalog(rulesResponse.catalog);
+      setRulesConfig(rulesResponse.config);
+      setRulesDirty(false);
     } catch (cause) {
       setListError(cause instanceof Error ? cause.message : "Failed to load adapters.");
     }
   }, []);
 
   useEffect(() => {
-    void loadAdapters();
-  }, [loadAdapters]);
+    void loadAll();
+  }, [loadAll]);
 
   function setRow(name: string, next: Partial<RowState>) {
     setRowState((current) => ({
@@ -64,7 +125,7 @@ export function Settings({ onShellRefresh }: SettingsProps) {
     try {
       const message = await fn();
       setRow(name, { action: "idle", message, error: null });
-      await loadAdapters();
+      await loadAll();
       await onShellRefresh();
     } catch (cause) {
       setRow(name, {
@@ -117,6 +178,37 @@ export function Settings({ onShellRefresh }: SettingsProps) {
     );
   }
 
+  const adapterNames = (adapters ?? []).map((adapter) => adapter.name);
+
+  function handleToggleRule(adapterName: string, ruleId: string) {
+    setRulesConfig((current) => toggleRuleForAdapter(current, ruleId, adapterName, adapterNames));
+    setRulesDirty(true);
+    setRulesMessage(null);
+    setRulesError(null);
+  }
+
+  function toggleExpand(name: string) {
+    setExpanded((current) => ({ ...current, [name]: !current[name] }));
+  }
+
+  async function handleSaveRules() {
+    setSavingRules(true);
+    setRulesMessage(null);
+    setRulesError(null);
+    try {
+      const result = await saveRules(rulesConfig);
+      setRulesMessage(
+        `Saved. Re-analyzed ${result.tracesAnalyzed} trace(s); ${result.findingsCount} waste finding(s).`,
+      );
+      await loadAll();
+      await onShellRefresh();
+    } catch (cause) {
+      setRulesError(cause instanceof Error ? cause.message : "Failed to save rules.");
+    } finally {
+      setSavingRules(false);
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-3xl">
       <div className="panel p-6">
@@ -124,7 +216,8 @@ export function Settings({ onShellRefresh }: SettingsProps) {
           <div>
             <h1 className="text-2xl font-semibold text-slate-50">Adapters</h1>
             <p className="section-copy mt-2 text-sm">
-              Install or uninstall adapters and sync their traces.{" "}
+              Install or uninstall adapters, sync their traces, and choose which waste-detection
+              rules run for each.{" "}
               <a
                 href={ADAPTERS_DIR_URL}
                 target="_blank"
@@ -135,11 +228,7 @@ export function Settings({ onShellRefresh }: SettingsProps) {
               </a>
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => void loadAdapters()}
-            className="button-ghost text-xs"
-          >
+          <button type="button" onClick={() => void loadAll()} className="button-ghost text-xs">
             Refresh list
           </button>
         </div>
@@ -147,6 +236,10 @@ export function Settings({ onShellRefresh }: SettingsProps) {
         <OssLimitsCallout />
 
         {listError ? <div className="banner banner--error mt-6 text-sm">{listError}</div> : null}
+        {rulesError ? <div className="banner banner--error mt-6 text-sm">{rulesError}</div> : null}
+        {rulesMessage ? (
+          <div className="banner banner--info mt-6 text-sm">{rulesMessage}</div>
+        ) : null}
 
         <div className="mt-6 space-y-3">
           {adapters === null ? (
@@ -160,6 +253,16 @@ export function Settings({ onShellRefresh }: SettingsProps) {
                 onSync={handleSync}
                 onInstall={handleInstall}
                 onUninstall={handleUninstall}
+                rulesCatalog={rulesCatalog}
+                isExpanded={expanded[adapter.name] ?? false}
+                onToggleExpand={() => toggleExpand(adapter.name)}
+                isRuleChecked={(ruleId) =>
+                  ruleAppliesToAdapter(rulesConfig.rules[ruleId], adapter.name)
+                }
+                onToggleRule={(ruleId) => handleToggleRule(adapter.name, ruleId)}
+                onSaveRules={() => void handleSaveRules()}
+                savingRules={savingRules}
+                rulesDirty={rulesDirty}
               />
             ))
           )}
@@ -204,10 +307,35 @@ interface AdapterRowProps {
   onSync: (adapter: InstalledAdapter) => void;
   onInstall: (adapter: MissingAdapter) => void;
   onUninstall: (adapter: InstalledAdapter) => void;
+  rulesCatalog: RuleCatalogEntry[];
+  isExpanded: boolean;
+  onToggleExpand: () => void;
+  isRuleChecked: (ruleId: string) => boolean;
+  onToggleRule: (ruleId: string) => void;
+  onSaveRules: () => void;
+  savingRules: boolean;
+  rulesDirty: boolean;
 }
 
-function AdapterRow({ adapter, state, onSync, onInstall, onUninstall }: AdapterRowProps) {
+function AdapterRow({
+  adapter,
+  state,
+  onSync,
+  onInstall,
+  onUninstall,
+  rulesCatalog,
+  isExpanded,
+  onToggleExpand,
+  isRuleChecked,
+  onToggleRule,
+  onSaveRules,
+  savingRules,
+  rulesDirty,
+}: AdapterRowProps) {
   const busy = state.action !== "idle";
+  const enabledRuleCount = adapter.installed
+    ? rulesCatalog.filter((rule) => isRuleChecked(rule.id)).length
+    : 0;
 
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-alt)] p-4">
@@ -285,6 +413,64 @@ function AdapterRow({ adapter, state, onSync, onInstall, onUninstall }: AdapterR
         <div className="mt-3 rounded-xl bg-[color:var(--surface-soft)] px-3 py-2 text-[11px] text-slate-400">
           Or run from your terminal:{" "}
           <code className="text-slate-200">{adapter.installCommand}</code>
+        </div>
+      ) : null}
+
+      {adapter.installed && rulesCatalog.length > 0 ? (
+        <div className="mt-3 border-t border-[color:var(--border)] pt-3">
+          <button
+            type="button"
+            onClick={onToggleExpand}
+            className="flex items-center gap-2 text-xs font-medium text-slate-300 hover:text-slate-100"
+          >
+            <span aria-hidden>{isExpanded ? "▾" : "▸"}</span>
+            <span>
+              Waste rules{" "}
+              <span className="text-slate-500">
+                ({enabledRuleCount}/{rulesCatalog.length} on)
+              </span>
+            </span>
+          </button>
+
+          {isExpanded ? (
+            <div className="mt-3">
+              <p className="mb-2 text-[11px] text-slate-500">
+                Only the rules you check run for {adapter.label}. Detection is opt-in.
+              </p>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {rulesCatalog.map((rule) => (
+                  <label
+                    key={rule.id}
+                    className="flex items-start gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-200 hover:bg-[color:var(--surface-soft)]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isRuleChecked(rule.id)}
+                      onChange={() => onToggleRule(rule.id)}
+                      className="mt-1"
+                    />
+                    <span className="min-w-0">
+                      <span className="font-medium">{rule.title}</span>
+                      <span className="ml-1 text-[10px] text-slate-500">T{rule.tier}</span>
+                      <span className="block text-[11px] leading-snug text-slate-500">
+                        {rule.description}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div className="mt-3 flex justify-end">
+                <button
+                  type="button"
+                  onClick={onSaveRules}
+                  disabled={savingRules || !rulesDirty}
+                  className="button-primary px-3 py-2 text-sm"
+                >
+                  {savingRules ? "Saving…" : "Save & analyze"}
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 

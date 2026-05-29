@@ -13,8 +13,11 @@ function toSignature(
 }
 
 export const agentLoopsRule: WasteRule = {
-  name: "agent-loops",
+  id: "agent-loops",
   tier: 1,
+  title: "Agent loops",
+  description: "Repeated near-identical agent steps indicate an unproductive loop.",
+  defaultEnabled: true,
   detect(contexts): WasteReportRecord[] {
     return contexts.flatMap((context) => {
       const repeatedToolSpans = [];

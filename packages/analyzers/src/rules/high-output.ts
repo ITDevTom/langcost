@@ -7,8 +7,11 @@ import type { WasteRule } from "./types";
 const PRODUCTIVE_TOOLS = new Set(["Edit", "Write", "Agent", "NotebookEdit"]);
 
 export const highOutputRule: WasteRule = {
-  name: "high-output",
+  id: "high-output",
   tier: 1,
+  title: "High output spans",
+  description: "Unusually large model outputs relative to the rest of the trace.",
+  defaultEnabled: true,
   detect(contexts): WasteReportRecord[] {
     return contexts.flatMap((context) => {
       // Skip traces marked as interactive/conversational by the adapter.

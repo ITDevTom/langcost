@@ -72,8 +72,23 @@ export interface DashboardCommandOptions {
   dbPath?: string;
 }
 
+export type RulesAction = "list" | "enable" | "disable" | "scope" | "set" | "apply";
+
+export interface RulesCommandOptions {
+  command: "rules";
+  action: RulesAction;
+  ruleId?: string;
+  /** For `scope`: "*" (all adapters) or an allow-list of trace.source values. */
+  sources?: "*" | string[];
+  /** For `set`: threshold key/value. */
+  thresholdKey?: string;
+  thresholdValue?: number;
+  dbPath?: string;
+}
+
 export type CliCommand =
   | ScanCommandOptions
   | ReportCommandOptions
   | StatusCommandOptions
-  | DashboardCommandOptions;
+  | DashboardCommandOptions
+  | RulesCommandOptions;

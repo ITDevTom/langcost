@@ -6,6 +6,7 @@ import { Hono } from "hono";
 import { createAdaptersRoute } from "./routes/adapters";
 import { createHealthRoute } from "./routes/health";
 import { createOverviewRoute } from "./routes/overview";
+import { createRulesRoute } from "./routes/rules";
 import { createScanRoute } from "./routes/scan";
 import { createSegmentsRoute } from "./routes/segments";
 import { createSettingsRoute } from "./routes/settings";
@@ -103,6 +104,7 @@ export function createApiApp(options: ApiAppOptions = {}) {
   app.route("/api/v1/traces", createTracesRoute(routeOptions));
   app.route("/api/v1/waste", createWasteRoute(routeOptions));
   app.route("/api/v1/segments", createSegmentsRoute(routeOptions));
+  app.route("/api/v1/rules", createRulesRoute(routeOptions));
   app.route("/api/v1/scan", createScanRoute(routeOptions));
 
   app.get("*", async (c) => serveWebAsset(c.req.path, distPath));
