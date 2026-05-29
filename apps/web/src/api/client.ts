@@ -522,3 +522,47 @@ export async function uninstallAdapter(name: string): Promise<{ ok: boolean }> {
     method: "DELETE",
   });
 }
+
+export type RuleDataRequirement = "messages" | "cacheTokens" | "toolDefs" | "spans";
+
+export interface RuleCatalogEntry {
+  id: string;
+  tier: 1 | 2;
+  title: string;
+  description: string;
+  defaultEnabled: boolean;
+  requires: RuleDataRequirement[];
+  defaultThresholds: Record<string, number>;
+}
+
+export interface RuleConfigEntry {
+  enabled: boolean;
+  sources: "*" | string[];
+  thresholds?: Record<string, number>;
+}
+
+export interface RulesConfig {
+  rules: Record<string, RuleConfigEntry>;
+}
+
+export interface RulesResponse {
+  catalog: RuleCatalogEntry[];
+  config: RulesConfig;
+}
+
+export interface SaveRulesResult {
+  ok: boolean;
+  tracesAnalyzed: number;
+  findingsCount: number;
+}
+
+export async function getRules(): Promise<RulesResponse> {
+  return request<RulesResponse>("/rules");
+}
+
+export async function saveRules(config: RulesConfig): Promise<SaveRulesResult> {
+  return request<SaveRulesResult>("/rules", {
+    method: "PUT",
+    body: JSON.stringify(config),
+  });
+}

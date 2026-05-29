@@ -35,6 +35,11 @@ apps/
                   → Hono API + React app   (langcost dashboard)
 ```
 
+Waste detection is **opt-in**: `waste-detector` reads the user's `rules_config` (a settings-table
+key) and runs only the rules they've enabled, scoped to the adapters they chose (matched on
+`trace.source`). Rules live in a registry (`@langcost/analyzers` → `rules/registry.ts`); the
+built-in rules register themselves there.
+
 The CLI is the only entry point users invoke. Adapters are loaded dynamically via `import(@langcost/adapter-${name})` — the CLI never statically imports an adapter.
 
 ## Publishing model
@@ -131,7 +136,7 @@ This means adding a new adapter is a non-breaking change to the CLI: ship a new 
 ## Rules for future changes
 
 - **Do not add a static adapter import to `packages/cli/`.** The CLI must remain source-agnostic.
-- **Do not import adapters from `@langcost/analyzers`.** Analyzers run only against normalized data.
+- **Do not import adapters from `@langcost/analyzers`.** Analyzers run only against normalized data. Per-adapter rule scoping is done by matching the normalized `trace.source` field against user config — never by importing or hardcoding an adapter.
 - **Do not publish `@langcost/api` or `@langcost/web`.** If you find yourself wanting to, re-read the Option A and Option B sections above.
 - **Do not turn `@langcost/core`/`@langcost/db`/`@langcost/analyzers` into subpath exports of `langcost`.** Re-read Option B.
 - **Do not hand-write versions in `package.json`.** Use `bun add` so the lockfile stays in sync.

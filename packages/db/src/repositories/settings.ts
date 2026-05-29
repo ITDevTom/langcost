@@ -1,3 +1,4 @@
+import type { RulesConfig } from "@langcost/core";
 import { eq } from "drizzle-orm";
 
 import type { Db } from "../client";
@@ -22,6 +23,7 @@ function toRow(record: SettingRecord): SettingRecord {
 }
 
 const SOURCE_SETTINGS_KEY = "source_config";
+const RULES_SETTINGS_KEY = "rules_config";
 
 export function createSettingsRepository(db: Db) {
   function setValue(key: string, value: Record<string, unknown>, updatedAt = new Date()): void {
@@ -69,6 +71,13 @@ export function createSettingsRepository(db: Db) {
         },
         updatedAt,
       );
+    },
+    getRulesConfig(): RulesConfig | null {
+      const row = db.select().from(settings).where(eq(settings.key, RULES_SETTINGS_KEY)).get();
+      return (row?.value as RulesConfig | undefined) ?? null;
+    },
+    setRulesConfig(value: RulesConfig, updatedAt = new Date()): void {
+      setValue(RULES_SETTINGS_KEY, { rules: value.rules }, updatedAt);
     },
   };
 }

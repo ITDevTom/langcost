@@ -53,8 +53,11 @@ function hasRetryEvidence(failedSpan: SpanRecord, toolSpans: SpanRecord[]): bool
 }
 
 export const toolFailuresRule: WasteRule = {
-  name: "tool-failures",
+  id: "tool-failures",
   tier: 1,
+  title: "Tool failure waste",
+  description: "Failed tool calls that triggered costly model retries.",
+  defaultEnabled: true,
   detect(contexts): WasteReportRecord[] {
     return contexts.flatMap((context) => {
       const candidateFailures = context.toolSpans.filter(

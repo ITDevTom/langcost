@@ -3,6 +3,9 @@ import { copyFileSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { allRulesEnabledConfig } from "@langcost/analyzers";
+import { createDb, createSettingsRepository, getSqliteClient } from "@langcost/db";
+
 import { createApiApp } from "../src/index";
 
 const cleanupPaths: string[] = [];
@@ -172,6 +175,11 @@ describe("@langcost/api", () => {
       sourcePath,
       hasApiKey: true,
     });
+
+    // Strict opt-in: enable all rules before scanning so the analyzer produces waste reports.
+    const seedDb = createDb(dbPath);
+    createSettingsRepository(seedDb).setRulesConfig(allRulesEnabledConfig());
+    getSqliteClient(seedDb).close(false);
 
     const scanResponse = await app.request("/api/v1/scan", {
       method: "POST",
@@ -356,5 +364,77 @@ describe("@langcost/api", () => {
     expect(health.spanCount).toBeGreaterThan(0);
     expect(health.messageCount).toBeGreaterThan(0);
     expect(health.traceLimit).toBe(500);
+  });
+
+  it("manages waste rules via the rules API and re-analyzes on save", async () => {
+    const dbPath = createTempDbPath();
+    const sourcePath = createFixtureSourcePath(["model-overuse-session.jsonl"]);
+    const app = createApiApp({ dbPath });
+    const jsonHeaders = { "Content-Type": "application/json" };
+
+    await app.request("/api/v1/settings", {
+      method: "PUT",
+      headers: jsonHeaders,
+      body: JSON.stringify({ source: "openclaw", sourcePath }),
+    });
+    const scanResponse = await app.request("/api/v1/scan", {
+      method: "POST",
+      headers: jsonHeaders,
+      body: JSON.stringify({}),
+    });
+    expect(scanResponse.status).toBe(200);
+
+    // Catalog is present; config starts empty (strict opt-in) so no waste is detected yet.
+    const getResponse = await app.request("/api/v1/rules");
+    expect(getResponse.status).toBe(200);
+    const rules = await readJson<{
+      catalog: Array<{ id: string; tier: number; title: string }>;
+      config: { rules: Record<string, unknown> };
+    }>(getResponse);
+    expect(rules.catalog.length).toBeGreaterThan(0);
+    expect(rules.catalog.some((entry) => entry.id === "model-overuse")).toBe(true);
+    expect(Object.keys(rules.config.rules)).toHaveLength(0);
+
+    const wasteBefore = await readJson<{ total: number }>(await app.request("/api/v1/waste"));
+    expect(wasteBefore.total).toBe(0);
+
+    // Enabling a rule persists config and re-analyzes already-ingested traces.
+    const putResponse = await app.request("/api/v1/rules", {
+      method: "PUT",
+      headers: jsonHeaders,
+      body: JSON.stringify({ rules: { "model-overuse": { enabled: true, sources: "*" } } }),
+    });
+    expect(putResponse.status).toBe(200);
+    const put = await readJson<{ ok: boolean; tracesAnalyzed: number; findingsCount: number }>(
+      putResponse,
+    );
+    expect(put.ok).toBe(true);
+    expect(put.tracesAnalyzed).toBeGreaterThan(0);
+
+    const wasteAfter = await readJson<{
+      total: number;
+      summary: { byCategory: Array<{ category: string }> };
+    }>(await app.request("/api/v1/waste"));
+    expect(wasteAfter.total).toBeGreaterThan(0);
+    expect(wasteAfter.summary.byCategory.some((entry) => entry.category === "model_overuse")).toBe(
+      true,
+    );
+
+    // Disabling it again clears the findings on re-analyze.
+    await app.request("/api/v1/rules", {
+      method: "PUT",
+      headers: jsonHeaders,
+      body: JSON.stringify({ rules: { "model-overuse": { enabled: false, sources: "*" } } }),
+    });
+    const wasteCleared = await readJson<{ total: number }>(await app.request("/api/v1/waste"));
+    expect(wasteCleared.total).toBe(0);
+
+    // Malformed config is rejected.
+    const badResponse = await app.request("/api/v1/rules", {
+      method: "PUT",
+      headers: jsonHeaders,
+      body: JSON.stringify({ rules: { "model-overuse": { enabled: "yes" } } }),
+    });
+    expect(badResponse.status).toBe(400);
   });
 });

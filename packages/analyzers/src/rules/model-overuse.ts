@@ -10,8 +10,11 @@ import {
 import type { WasteRule } from "./types";
 
 export const modelOveruseRule: WasteRule = {
-  name: "model-overuse",
+  id: "model-overuse",
   tier: 1,
+  title: "Expensive model overuse",
+  description: "A cheaper model could have served these spans at comparable cost-efficiency.",
+  defaultEnabled: true,
   detect(contexts): WasteReportRecord[] {
     return contexts.flatMap((context) => {
       if (context.llmSpans.length === 0) {

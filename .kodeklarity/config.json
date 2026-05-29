@@ -215,9 +215,13 @@
   },
   "ignoreCoverage": [
     "packages/core/src/index.ts",
+    "packages/core/src/types/index.ts",
+    "packages/core/src/types/rules.ts",
     "packages/cli/src/types.ts",
     "packages/adapter-codex/src/index.ts",
     "packages/adapter-codex/src/types.ts",
+    "packages/analyzers/src/rules/index.ts",
+    "packages/analyzers/src/rules/types.ts",
     "scripts/release.ts"
   ]
 }

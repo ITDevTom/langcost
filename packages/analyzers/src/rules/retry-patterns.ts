@@ -5,8 +5,11 @@ import { createWasteReport, jaccardSimilarity, severityFromCost } from "./shared
 import type { WasteRule } from "./types";
 
 export const retryPatternsRule: WasteRule = {
-  name: "retry-patterns",
+  id: "retry-patterns",
   tier: 1,
+  title: "Retry waste",
+  description: "Repeated retried LLM calls burned tokens without new progress.",
+  defaultEnabled: true,
   detect(contexts): WasteReportRecord[] {
     return contexts.flatMap((context) => {
       const userMessages = context.messages.filter((message) => message.role === "user");

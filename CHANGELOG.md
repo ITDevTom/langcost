@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **Modular, opt-in waste rules.** Waste detection rules are now a registry (`packages/analyzers/src/rules/registry.ts`) with per-rule metadata (`id`, `title`, `description`, `defaultEnabled`, `requires`, `defaultThresholds`) instead of a static array. Configuration is stored in a new `rules_config` settings key (no migration).
+- **Per-adapter rule selection.** A rule can be scoped to specific adapters via `trace.source` — e.g. run `duplicate-rag` only on Langfuse traces. The runner filters by source and a data-availability gate (`requires`), so rules stay source-agnostic.
+- **CLI**: `langcost rules list | enable <id> | disable <id> | scope <id> <all|src,src> | set <id> <key> <value> | apply`. Mutations re-analyze already-ingested traces.
+- **API**: `GET /api/v1/rules` (catalog + config) and `PUT /api/v1/rules` (validate, persist, and re-analyze stored traces).
+- **Dashboard**: each installed adapter on the **Adapters** page has an expandable *Waste rules* section to pick which rules run for it; **Save & analyze** persists and recomputes.
+
+### Changed
+- **Waste detection is strictly opt-in.** A fresh install (no `rules_config`) detects **no** waste until rules are enabled — previously the built-in rules always ran. The CLI/API/dashboard all gate on the user-enabled set.
+- **Internal (`@langcost/analyzers`)**: `WasteRule.name` renamed to `id` plus added metadata fields; the `tier1Rules` export was removed in favor of `getRuleCatalog()` / `resolveRules()`. Rule `detect(contexts, config?)` gained an optional resolved-config argument.
+
 ## [0.16.0] - 2026-05-17
 
 ### Added

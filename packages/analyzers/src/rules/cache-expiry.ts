@@ -8,8 +8,12 @@ const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 const MIN_CACHE_WRITE_TOKENS = 10_000; // Only flag if significant cache write
 
 export const cacheExpiryRule: WasteRule = {
-  name: "cache-expiry",
+  id: "cache-expiry",
   tier: 1,
+  title: "Cache expiry",
+  description: "Cache writes were re-paid after the cache TTL elapsed.",
+  defaultEnabled: true,
+  requires: ["cacheTokens"],
   detect(contexts): WasteReportRecord[] {
     return contexts.flatMap((context) => {
       const reports: WasteReportRecord[] = [];

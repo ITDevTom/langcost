@@ -4,6 +4,7 @@ import type {
   CliCommand,
   DashboardCommandOptions,
   ReportCommandOptions,
+  RulesCommandOptions,
   ScanCommandOptions,
   StatusCommandOptions,
 } from "./types";
@@ -31,6 +32,15 @@ langcost dashboard [options]
   --db <path>             Override database path
 
 langcost status [options]
+  --db <path>             Override database path
+
+langcost rules <action> [options]
+  list                    Show rules: enabled state, adapter scope, thresholds
+  enable <id>             Enable a rule (runs on all adapters by default)
+  disable <id>            Disable a rule (waste detection is strictly opt-in)
+  scope <id> <spec>       Restrict a rule to adapters: "all" or "openclaw,codex"
+  set <id> <key> <value>  Override a numeric rule threshold
+  apply                   Re-run waste detection over stored traces
   --db <path>             Override database path`;
 
 const BOOLEAN_FLAGS = new Set(["force", "help", "no-open"]);
@@ -228,6 +238,85 @@ function parseStatus(flags: Map<string, string | boolean>): StatusCommandOptions
   };
 }
 
+function parseRules(argv: string[]): RulesCommandOptions {
+  const positionals: string[] = [];
+  let dbPath: string | undefined;
+
+  let index = 1; // skip the "rules" command token
+  while (index < argv.length) {
+    const token = argv[index];
+    if (!token) {
+      break;
+    }
+    if (token === "--db") {
+      const value = argv[index + 1];
+      if (!value || value.startsWith("--")) {
+        invalid("Missing value for --db.");
+      }
+      dbPath = value;
+      index += 2;
+      continue;
+    }
+    if (token.startsWith("--")) {
+      invalid(`Unexpected flag for rules: ${token}`);
+    }
+    positionals.push(token);
+    index += 1;
+  }
+
+  const action = positionals[0];
+  const base = { command: "rules" as const, ...(dbPath ? { dbPath } : {}) };
+
+  switch (action) {
+    case "list":
+    case "apply":
+      return { ...base, action };
+    case "enable":
+    case "disable": {
+      const ruleId = positionals[1];
+      if (!ruleId) {
+        invalid(`rules ${action} requires a <rule-id>.`);
+      }
+      return { ...base, action, ruleId };
+    }
+    case "scope": {
+      const ruleId = positionals[1];
+      const spec = positionals[2];
+      if (!ruleId || !spec) {
+        invalid("rules scope requires <rule-id> <all|source,source,...>.");
+      }
+      const sources: "*" | string[] =
+        spec === "all" || spec === "*"
+          ? "*"
+          : spec
+              .split(",")
+              .map((entry) => entry.trim())
+              .filter(Boolean);
+      if (sources !== "*" && sources.length === 0) {
+        invalid("rules scope: no valid sources provided.");
+      }
+      return { ...base, action, ruleId, sources };
+    }
+    case "set": {
+      const ruleId = positionals[1];
+      const key = positionals[2];
+      const rawValue = positionals[3];
+      if (!ruleId || !key || rawValue === undefined) {
+        invalid("rules set requires <rule-id> <key> <value>.");
+      }
+      const value = Number(rawValue);
+      if (!Number.isFinite(value)) {
+        invalid(`rules set: value must be numeric, got "${rawValue}".`);
+      }
+      return { ...base, action, ruleId, thresholdKey: key, thresholdValue: value };
+    }
+    default:
+      invalid(
+        `Unknown rules action: ${action ?? "(none)"}. Use list | enable | disable | scope | set | apply.`,
+      );
+  }
+}
+
 function parseDashboard(flags: Map<string, string | boolean>): DashboardCommandOptions {
   const dbPath = getStringFlag(flags, "db");
   return {
@@ -243,6 +332,10 @@ export function getHelpText(): string {
 }
 
 export function parseArgv(argv: string[], now = new Date()): CliCommand | { command: "help" } {
+  if (argv[0] === "rules" && !argv.includes("--help") && !argv.includes("-h")) {
+    return parseRules(argv);
+  }
+
   const { command: explicitCommand, flags } = parseFlags(argv);
   const help = flags.get("help") === true;
 

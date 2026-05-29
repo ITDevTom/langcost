@@ -82,7 +82,15 @@ langcost scan --source claude-code
 langcost dashboard
 ```
 
-LangCost auto-detects your agent's data directory, ingests your sessions, runs waste analysis, and serves a local dashboard at `http://localhost:3737`.
+LangCost auto-detects your agent's data directory, ingests your sessions, and serves a local dashboard at `http://localhost:3737`.
+
+> **Waste detection is opt-in.** Nothing is flagged until you turn rules on — pick which checks run for each adapter on the dashboard's **Adapters** page, or from the CLI:
+>
+> ```bash
+> langcost rules enable low-cache          # enable a rule for all adapters
+> langcost rules scope retry-patterns claude-code,openclaw   # or scope it to specific ones
+> langcost rules list                      # see what's on
+> ```
 
 > **Why two packages?** `langcost` is the core engine — analysis, dashboard, and reports. Adapters are plugins that read data from specific agent frameworks. Install only what you use.
 
@@ -158,7 +166,7 @@ See [Contributing](#contributing) for the full adapter spec.
 
 ### Waste Detection
 
-Six rules that automatically find wasted spend in every session:
+Rules that find wasted spend in your sessions. Detection is **opt-in** — you enable the checks you want, and you choose them **per adapter** (e.g. run cache checks on Claude Code but not Warp). Available rules:
 
 | | Rule | What it finds |
 |:---:|------|-------------|
@@ -170,6 +178,8 @@ Six rules that automatically find wasted spend in every session:
 | 🔵 | **Model Insight** | Flags expensive model usage — 100% Opus usage, helps you decide when cheaper models suffice |
 
 Every finding includes the **dollar amount wasted** and a **specific recommendation** to fix it.
+
+**Choosing rules:** open `langcost dashboard` → **Adapters**, expand an adapter's *Waste rules* section, check the rules you want, and **Save & analyze**. The CLI mirrors this — `langcost rules enable/disable/scope/set` (see [CLI Reference](#cli-reference)). Changing the selection re-analyzes your already-ingested traces; no re-scan needed.
 
 <br/>
 
@@ -264,7 +274,7 @@ Using a self-hosted or unlisted model? Costs show as $0 but all token counts and
     └─────┬────┘
           ▼
     ┌──────────┐
-    │  analyze  │  Run 6 waste detection rules (source-agnostic)
+    │  analyze  │  Run the waste rules you enabled (source-agnostic, opt-in)
     └─────┬────┘
           ▼
     ┌──────────┐
@@ -342,6 +352,25 @@ langcost status
 
 </details>
 
+<details>
+<summary><code>langcost rules</code></summary>
+
+```
+langcost rules <action> [options]
+  list                    Show rules: enabled state, adapter scope, thresholds
+  enable <id>             Enable a rule (runs on all adapters by default)
+  disable <id>            Disable a rule (waste detection is strictly opt-in)
+  scope <id> <spec>       Restrict a rule to adapters: "all" or "openclaw,codex"
+  set <id> <key> <value>  Override a numeric rule threshold
+  apply                   Re-run waste detection over stored traces
+  --db <path>             Override database path
+```
+
+Detection is opt-in: a fresh install runs **no** rules until you enable them. Enabling, disabling,
+scoping, or setting a threshold re-analyzes your already-ingested traces automatically.
+
+</details>
+
 <br/>
 
 ---
@@ -367,7 +396,7 @@ langcost status
 
 LangCost has a plugin architecture. Three ways to contribute:
 
-> **🧩 Add a waste rule** — standalone function in `packages/analyzers/src/rules/`. Copy an existing rule as a starting point. Rules are source-agnostic and never import adapters.
+> **🧩 Add a waste rule** — export a `WasteRule` from `packages/analyzers/src/rules/` (`id`, `title`, `description`, `defaultEnabled`, optional `requires`, and a `detect(contexts)`), then register it in `rules/registry.ts`. Copy an existing rule as a starting point. Rules are source-agnostic and never import adapters; users opt into them per adapter.
 
 > **💲 Update model pricing** — edit `packages/core/src/pricing/providers.ts`. Add new models or fix outdated prices.
 
