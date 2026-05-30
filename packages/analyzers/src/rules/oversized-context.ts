@@ -60,11 +60,12 @@ export const oversizedContextRule: WasteRule = {
           continue;
         }
 
-        const baseline = triggeredByAbsolute && triggeredByRelative
-          ? Math.max(minInputTokens, relativeThreshold)
-          : triggeredByAbsolute
-            ? minInputTokens
-            : relativeThreshold;
+        const baseline =
+          triggeredByAbsolute && triggeredByRelative
+            ? Math.max(minInputTokens, relativeThreshold)
+            : triggeredByAbsolute
+              ? minInputTokens
+              : relativeThreshold;
         const excessTokens = Math.max(0, inputTokens - baseline);
         const wastedCostUsd = span.costUsd ? span.costUsd * (excessTokens / inputTokens) : 0;
 
