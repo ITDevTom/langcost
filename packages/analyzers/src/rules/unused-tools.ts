@@ -1,6 +1,6 @@
 import type { WasteReportRecord } from "@langcost/db";
 
-import { jaccardSimilarity, createWasteReport, severityFromCost } from "./shared";
+import { createWasteReport, jaccardSimilarity, severityFromCost } from "./shared";
 import type { ResolvedRuleConfig, WasteRule } from "./types";
 
 const PRODUCTIVE_TOOL_NAMES = new Set(["Edit", "Write", "NotebookEdit", "Agent"]);
@@ -62,12 +62,18 @@ export const unusedToolsRule: WasteRule = {
           continue;
         }
 
-        const toolResultTokens = toolResultSegments.reduce((sum, segment) => sum + segment.tokenCount, 0);
+        const toolResultTokens = toolResultSegments.reduce(
+          (sum, segment) => sum + segment.tokenCount,
+          0,
+        );
         if (toolResultTokens < minToolResultTokens) {
           continue;
         }
 
-        const toolResultCostUsd = toolResultSegments.reduce((sum, segment) => sum + segment.costUsd, 0);
+        const toolResultCostUsd = toolResultSegments.reduce(
+          (sum, segment) => sum + segment.costUsd,
+          0,
+        );
         const outputText =
           (tool.toolOutput ?? "").trim() || getSpanMessagesContent(messagesBySpanId, tool.id);
         if (outputText.length === 0) {
@@ -87,7 +93,8 @@ export const unusedToolsRule: WasteRule = {
         );
         const nextToolInput = (nextTool?.toolInput ?? "").trim();
 
-        const similarityWithNextLlm = nextLlmText.length > 0 ? jaccardSimilarity(outputText, nextLlmText) : 0;
+        const similarityWithNextLlm =
+          nextLlmText.length > 0 ? jaccardSimilarity(outputText, nextLlmText) : 0;
         const similarityWithNextToolInput =
           nextToolInput.length > 0 ? jaccardSimilarity(outputText, nextToolInput) : 0;
         const similarityScore = Math.max(similarityWithNextLlm, similarityWithNextToolInput);

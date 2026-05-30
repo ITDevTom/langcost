@@ -90,7 +90,10 @@ export const unboundedHistoryRule: WasteRule = {
             return undefined;
           }
 
-          const historyTokens = historySegments.reduce((sum, segment) => sum + segment.tokenCount, 0);
+          const historyTokens = historySegments.reduce(
+            (sum, segment) => sum + segment.tokenCount,
+            0,
+          );
           if (historyTokens <= 0) {
             return undefined;
           }
@@ -110,8 +113,7 @@ export const unboundedHistoryRule: WasteRule = {
       }
 
       const affected = entries.filter(
-        (entry) =>
-          entry.historyTokens >= minHistoryTokens && entry.historyShare >= minHistoryShare,
+        (entry) => entry.historyTokens >= minHistoryTokens && entry.historyShare >= minHistoryShare,
       );
       if (affected.length === 0) {
         return [];
@@ -119,11 +121,17 @@ export const unboundedHistoryRule: WasteRule = {
 
       const growth = hasStrongGrowth(entries, minConsecutiveGrowingSpans, growthMultiplier);
       const wastedTokens = affected.reduce((sum, entry) => {
-        const allowedHistoryTokens = Math.max(minHistoryTokens, entry.inputTokens * minHistoryShare);
+        const allowedHistoryTokens = Math.max(
+          minHistoryTokens,
+          entry.inputTokens * minHistoryShare,
+        );
         return sum + Math.max(0, entry.historyTokens - allowedHistoryTokens);
       }, 0);
       const wastedCostUsd = affected.reduce((sum, entry) => {
-        const allowedHistoryTokens = Math.max(minHistoryTokens, entry.inputTokens * minHistoryShare);
+        const allowedHistoryTokens = Math.max(
+          minHistoryTokens,
+          entry.inputTokens * minHistoryShare,
+        );
         const excessTokens = Math.max(0, entry.historyTokens - allowedHistoryTokens);
         const excessCost =
           entry.historyTokens > 0 ? entry.historyCostUsd * (excessTokens / entry.historyTokens) : 0;

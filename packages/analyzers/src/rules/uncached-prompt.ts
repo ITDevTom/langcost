@@ -6,7 +6,9 @@ import type { ResolvedRuleConfig, WasteRule } from "./types";
 
 const STABLE_SEGMENT_TYPES = new Set(["system_prompt", "tool_schema"]);
 
-function getCacheReadTokens(metadata: Record<string, unknown> | null | undefined): number | undefined {
+function getCacheReadTokens(
+  metadata: Record<string, unknown> | null | undefined,
+): number | undefined {
   return (
     getNumericMetadataValue(metadata, "cacheRead") ??
     getNumericMetadataValue(metadata, "cacheReadTokens") ??
@@ -87,7 +89,10 @@ export const uncachedPromptRule: WasteRule = {
       }
 
       const totalCacheReadTokens = cacheReads.reduce((sum, value) => sum + value, 0);
-      const totalInputTokens = affectedSpans.reduce((sum, span) => sum + (span.inputTokens ?? 0), 0);
+      const totalInputTokens = affectedSpans.reduce(
+        (sum, span) => sum + (span.inputTokens ?? 0),
+        0,
+      );
       const cacheReadRatio = totalInputTokens > 0 ? totalCacheReadTokens / totalInputTokens : 0;
       if (cacheReadRatio > maxCacheReadRatio) {
         return [];

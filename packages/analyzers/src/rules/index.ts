@@ -24,7 +24,7 @@ export {
 export { satisfiesRequirements } from "./requirements";
 export { retryPatternsRule } from "./retry-patterns";
 export { toolFailuresRule } from "./tool-failures";
-export { uncachedPromptRule } from "./uncached-prompt";
-export { unboundedHistoryRule } from "./unbounded-history";
-export { unusedToolsRule } from "./unused-tools";
 export type { ResolvedRuleConfig, WasteRule } from "./types";
+export { unboundedHistoryRule } from "./unbounded-history";
+export { uncachedPromptRule } from "./uncached-prompt";
+export { unusedToolsRule } from "./unused-tools";
