@@ -88,7 +88,20 @@ describe("oversizedContextRule", () => {
     expect(reports).toHaveLength(1);
     expect(reports[0]?.category).toBe("oversized_context");
     expect(reports[0]?.spanId).toBe("llm-2");
+    expect(reports[0]?.wastedTokens).toBe(10_000);
+    expect(reports[0]?.wastedCostUsd).toBeCloseTo(0.1333333333, 8);
     expect((reports[0]?.evidence as Record<string, unknown>).traceMedianInputTokens).toBe(30_600);
+    expect((reports[0]?.evidence as Record<string, unknown>).estimatedExcessTokens).toBe(10_000);
+    expect((reports[0]?.evidence as Record<string, unknown>).dominantSegmentTypes).toEqual([
+      { type: "conversation_history", tokenCount: 30_000 },
+      { type: "rag_context", tokenCount: 20_000 },
+      { type: "system_prompt", tokenCount: 10_000 },
+    ]);
+    expect((reports[0]?.evidence as Record<string, unknown>).segmentTokenTotalsByType).toEqual({
+      conversation_history: 30_000,
+      rag_context: 20_000,
+      system_prompt: 10_000,
+    });
     expect((reports[0]?.evidence as Record<string, unknown>).triggeredBy).toEqual({
       absolute: true,
       relativeToMedian: false,
@@ -118,6 +131,31 @@ describe("oversizedContextRule", () => {
     });
   });
 
+  it("uses the higher baseline when both absolute and relative thresholds trigger", () => {
+    const spans = [
+      makeLlmSpan("llm-1", 1, 20_000, 0.2),
+      makeLlmSpan("llm-2", 2, 20_000, 0.2),
+      makeLlmSpan("llm-3", 3, 100_000, 1.0),
+    ];
+    const context = buildTraceContext(makeTrace(), spans, [], []);
+
+    const reports = oversizedContextRule.detect([context]);
+
+    expect(reports).toHaveLength(1);
+    expect(reports[0]?.spanId).toBe("llm-3");
+    expect(reports[0]?.wastedTokens).toBe(40_000);
+    expect(reports[0]?.wastedCostUsd).toBeCloseTo(0.4, 8);
+    expect((reports[0]?.evidence as Record<string, unknown>).thresholds).toEqual({
+      minInputTokens: 50_000,
+      medianMultiplier: 3,
+      relativeThreshold: 60_000,
+    });
+    expect((reports[0]?.evidence as Record<string, unknown>).triggeredBy).toEqual({
+      absolute: true,
+      relativeToMedian: true,
+    });
+  });
+
   it("does not flag when all spans stay below both thresholds", () => {
     const spans = [
       makeLlmSpan("llm-1", 1, 900, 0.02),
@@ -126,6 +164,12 @@ describe("oversizedContextRule", () => {
     ];
     const context = buildTraceContext(makeTrace(), spans, [], []);
 
+    const reports = oversizedContextRule.detect([context]);
+    expect(reports).toHaveLength(0);
+  });
+
+  it("does not flag traces with no llm spans", () => {
+    const context = buildTraceContext(makeTrace(), [], [], []);
     const reports = oversizedContextRule.detect([context]);
     expect(reports).toHaveLength(0);
   });
