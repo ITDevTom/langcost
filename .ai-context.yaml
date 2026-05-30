@@ -1,0 +1,141 @@
+meta:
+  schema_version: 1
+  repo_name: langcost
+  repo_type: bun-monorepo
+  purpose: >-
+    Cost and waste analysis toolkit for LLM/agent traces. Ingests adapter data,
+    normalizes traces/spans/messages, computes cost segments, runs modular waste
+    detection rules, and exposes results through CLI/API/dashboard surfaces.
+  primary_language: typescript
+  runtime: bun
+  context_file: .ai-context.yaml
+  audience: ai-agents
+  human_optimized: false
+
+workspace:
+  manager: bun-workspaces
+  root_manifests:
+    - package.json
+    - bun.lock
+    - biome.json
+  key_docs:
+    - ARCHITECTURE.md
+    - CHANGELOG.md
+
+packages:
+  published:
+    - path: packages/cli
+      package: langcost
+      role: user-facing CLI entrypoint
+    - path: packages/core
+      package: "@langcost/core"
+      role: shared types/interfaces/pricing
+    - path: packages/db
+      package: "@langcost/db"
+      role: sqlite schema and repositories
+    - path: packages/analyzers
+      package: "@langcost/analyzers"
+      role: cost and waste analyzers
+    - path: packages/adapter-openclaw
+      package: "@langcost/adapter-openclaw"
+      role: source adapter
+    - path: packages/adapter-claude-code
+      package: "@langcost/adapter-claude-code"
+      role: source adapter
+    - path: packages/adapter-warp
+      package: "@langcost/adapter-warp"
+      role: source adapter
+    - path: packages/adapter-codex
+      package: "@langcost/adapter-codex"
+      role: source adapter
+    - path: packages/adapter-cline
+      package: "@langcost/adapter-cline"
+      role: source adapter
+  workspace_only:
+    - path: apps/api
+      package: "@langcost/api"
+      role: dashboard API app bundled into CLI
+    - path: apps/web
+      package: "@langcost/web"
+      role: dashboard web app bundled into CLI
+
+core_data_model:
+  entities:
+    - traces
+    - spans
+    - messages
+    - segments
+    - waste_reports
+    - settings
+  segment_types:
+    - system_prompt
+    - tool_schema
+    - conversation_history
+    - rag_context
+    - user_query
+    - assistant_response
+    - tool_result
+    - unknown
+  waste_rule_runtime:
+    detector: packages/analyzers/src/waste-detector.ts
+    context_builder: packages/analyzers/src/context.ts
+    registry: packages/analyzers/src/rules/registry.ts
+    config_key: rules_config
+    mode: strict_opt_in
+
+waste_rules:
+  built_in_ids:
+    - low-cache
+    - model-overuse
+    - agent-loops
+    - retry-patterns
+    - tool-failures
+    - duplicate-rag
+    - high-output
+    - oversized-context
+    - unbounded-history
+    - uncached-prompt
+    - unused-tools
+    - cache-expiry
+  rule_contract:
+    file: packages/analyzers/src/rules/types.ts
+    interface: WasteRule
+    detect_signature: detect(contexts, config?)
+
+developer_commands:
+  tests:
+    analyzers: bun test packages/analyzers/test
+  lint:
+    command: bun run lint
+    engine: biome
+  typecheck:
+    command: bun run typecheck
+
+high_risk_edit_zones:
+  - packages/analyzers/src/waste-detector.ts
+  - packages/analyzers/src/rules/registry.ts
+  - packages/db/src/schema/
+  - packages/db/src/repositories/
+  - packages/core/src/types/
+
+invariants:
+  - analyzer code must remain adapter-agnostic
+  - waste detection is opt-in via rules_config
+  - rule metadata must be surfaced through registry catalog
+  - trace.source scoping controls per-adapter rule execution
+  - waste categories must align with core/db schema unions
+
+agent_guidance:
+  read_order:
+    - .ai-context.yaml
+    - ARCHITECTURE.md
+    - packages/analyzers/src/rules/types.ts
+    - packages/analyzers/src/rules/registry.ts
+    - packages/analyzers/src/waste-detector.ts
+  when_adding_rule:
+    required_steps:
+      - add rule file under packages/analyzers/src/rules
+      - register in packages/analyzers/src/rules/registry.ts
+      - export in packages/analyzers/src/rules/index.ts
+      - add focused tests in packages/analyzers/test
+      - run bun test packages/analyzers/test
