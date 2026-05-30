@@ -85,7 +85,12 @@ function makeToolSpan(
   };
 }
 
-function makeToolResultSegment(id: string, spanId: string, tokenCount: number, costUsd: number): SegmentRecord {
+function makeToolResultSegment(
+  id: string,
+  spanId: string,
+  tokenCount: number,
+  costUsd: number,
+): SegmentRecord {
   return {
     id,
     spanId,
@@ -101,7 +106,12 @@ function makeToolResultSegment(id: string, spanId: string, tokenCount: number, c
   };
 }
 
-function makeMessage(id: string, spanId: string, role: MessageRecord["role"], content: string): MessageRecord {
+function makeMessage(
+  id: string,
+  spanId: string,
+  role: MessageRecord["role"],
+  content: string,
+): MessageRecord {
   return {
     id,
     spanId,
@@ -126,7 +136,9 @@ describe("unusedToolsRule", () => {
       makeToolResultSegment("seg-1", "tool-1", 3_000, 0.03),
       makeToolResultSegment("seg-2", "tool-2", 100, 0.001),
     ];
-    const messages = [makeMessage("msg-1", "llm-1", "assistant", "Let's rename a function and rerun tests.")];
+    const messages = [
+      makeMessage("msg-1", "llm-1", "assistant", "Let's rename a function and rerun tests."),
+    ];
 
     const context = buildTraceContext(makeTrace(), spans, messages, segments);
     const reports = unusedToolsRule.detect([context]);
@@ -141,9 +153,14 @@ describe("unusedToolsRule", () => {
   });
 
   it("does not flag productive tool names even with large outputs", () => {
-    const spans = [makeToolSpan("tool-1", 1, "Edit", "a lot of changed code output"), makeLlmSpan("llm-1", 2)];
+    const spans = [
+      makeToolSpan("tool-1", 1, "Edit", "a lot of changed code output"),
+      makeLlmSpan("llm-1", 2),
+    ];
     const segments = [makeToolResultSegment("seg-1", "tool-1", 4_000, 0.04)];
-    const messages = [makeMessage("msg-1", "llm-1", "assistant", "Applied patch and updated tests.")];
+    const messages = [
+      makeMessage("msg-1", "llm-1", "assistant", "Applied patch and updated tests."),
+    ];
 
     const context = buildTraceContext(makeTrace(), spans, messages, segments);
     const reports = unusedToolsRule.detect([context]);
