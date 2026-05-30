@@ -166,4 +166,19 @@ describe("unusedToolsRule", () => {
     const reports = unusedToolsRule.detect([context]);
     expect(reports).toHaveLength(0);
   });
+
+  it("does not flag productive tools when adapter emits alias-style names", () => {
+    const spans = [
+      makeToolSpan("tool-1", 1, "write_to_file", "a lot of changed code output"),
+      makeLlmSpan("llm-1", 2),
+    ];
+    const segments = [makeToolResultSegment("seg-1", "tool-1", 4_000, 0.04)];
+    const messages = [
+      makeMessage("msg-1", "llm-1", "assistant", "Applied patch and updated tests."),
+    ];
+
+    const context = buildTraceContext(makeTrace(), spans, messages, segments);
+    const reports = unusedToolsRule.detect([context]);
+    expect(reports).toHaveLength(0);
+  });
 });

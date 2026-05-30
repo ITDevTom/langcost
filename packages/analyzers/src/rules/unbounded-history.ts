@@ -11,6 +11,18 @@ interface SpanHistoryEntry {
   historyShare: number;
 }
 
+interface AffectedHistoryEntry extends SpanHistoryEntry {
+  allowedHistoryTokens: number;
+}
+
+function computeAllowedHistoryTokens(
+  entry: SpanHistoryEntry,
+  minHistoryTokens: number,
+  minHistoryShare: number,
+): number {
+  return Math.max(minHistoryTokens, entry.inputTokens * minHistoryShare);
+}
+
 function hasStrongGrowth(
   entries: SpanHistoryEntry[],
   minConsecutiveSpans: number,
@@ -112,27 +124,29 @@ export const unboundedHistoryRule: WasteRule = {
         return [];
       }
 
-      const affected = entries.filter(
-        (entry) => entry.historyTokens >= minHistoryTokens && entry.historyShare >= minHistoryShare,
-      );
+      const affected: AffectedHistoryEntry[] = entries
+        .filter(
+          (entry) =>
+            entry.historyTokens >= minHistoryTokens && entry.historyShare >= minHistoryShare,
+        )
+        .map((entry) => ({
+          ...entry,
+          allowedHistoryTokens: computeAllowedHistoryTokens(
+            entry,
+            minHistoryTokens,
+            minHistoryShare,
+          ),
+        }));
       if (affected.length === 0) {
         return [];
       }
 
       const growth = hasStrongGrowth(entries, minConsecutiveGrowingSpans, growthMultiplier);
       const wastedTokens = affected.reduce((sum, entry) => {
-        const allowedHistoryTokens = Math.max(
-          minHistoryTokens,
-          entry.inputTokens * minHistoryShare,
-        );
-        return sum + Math.max(0, entry.historyTokens - allowedHistoryTokens);
+        return sum + Math.max(0, entry.historyTokens - entry.allowedHistoryTokens);
       }, 0);
       const wastedCostUsd = affected.reduce((sum, entry) => {
-        const allowedHistoryTokens = Math.max(
-          minHistoryTokens,
-          entry.inputTokens * minHistoryShare,
-        );
-        const excessTokens = Math.max(0, entry.historyTokens - allowedHistoryTokens);
+        const excessTokens = Math.max(0, entry.historyTokens - entry.allowedHistoryTokens);
         const excessCost =
           entry.historyTokens > 0 ? entry.historyCostUsd * (excessTokens / entry.historyTokens) : 0;
         return sum + excessCost;

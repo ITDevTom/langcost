@@ -81,16 +81,25 @@ export const uncachedPromptRule: WasteRule = {
         return [];
       }
 
-      const cacheReads = affectedSpans
-        .map((span) => getCacheReadTokens(span.metadata))
-        .filter((value): value is number => value !== undefined);
-      if (cacheReads.length === 0) {
+      const spansWithCache = affectedSpans
+        .map((span) => ({ span, cacheReadTokens: getCacheReadTokens(span.metadata) }))
+        .filter(
+          (
+            entry,
+          ): entry is {
+            span: (typeof affectedSpans)[number];
+            cacheReadTokens: number;
+          } => entry.cacheReadTokens !== undefined,
+        );
+      if (spansWithCache.length === 0) {
         return [];
       }
-
-      const totalCacheReadTokens = cacheReads.reduce((sum, value) => sum + value, 0);
-      const totalInputTokens = affectedSpans.reduce(
-        (sum, span) => sum + (span.inputTokens ?? 0),
+      const totalCacheReadTokens = spansWithCache.reduce(
+        (sum, entry) => sum + entry.cacheReadTokens,
+        0,
+      );
+      const totalInputTokens = spansWithCache.reduce(
+        (sum, entry) => sum + (entry.span.inputTokens ?? 0),
         0,
       );
       const cacheReadRatio = totalInputTokens > 0 ? totalCacheReadTokens / totalInputTokens : 0;
@@ -123,6 +132,7 @@ export const uncachedPromptRule: WasteRule = {
             observedCacheReadTokens: totalCacheReadTokens,
             totalInputTokens,
             cacheReadRatio,
+            cacheEvaluatedSpanIds: spansWithCache.map((entry) => entry.span.id),
             stableSegmentTypes: [...new Set(repeatedSegments.map((segment) => segment.type))],
             thresholds: {
               minRepeatedTokens,

@@ -5,6 +5,27 @@ import type { ResolvedRuleConfig, WasteRule } from "./types";
 
 const PRODUCTIVE_TOOL_NAMES = new Set(["Edit", "Write", "NotebookEdit", "Agent"]);
 
+function toCanonicalToolName(toolName: string | null | undefined): string | null {
+  if (!toolName) {
+    return null;
+  }
+
+  const normalized = toolName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  const aliases: Record<string, string> = {
+    edit: "Edit",
+    strreplaceeditor: "Edit",
+    write: "Write",
+    writetofile: "Write",
+    notebookedit: "NotebookEdit",
+    agent: "Agent",
+  };
+
+  return aliases[normalized] ?? toolName;
+}
+
 function getSpanMessagesContent(
   messagesBySpanId: Map<string, string[]>,
   spanId: string | null | undefined,
@@ -51,7 +72,8 @@ export const unusedToolsRule: WasteRule = {
           continue;
         }
 
-        if (tool.toolName && PRODUCTIVE_TOOL_NAMES.has(tool.toolName)) {
+        const canonicalToolName = toCanonicalToolName(tool.toolName);
+        if (canonicalToolName && PRODUCTIVE_TOOL_NAMES.has(canonicalToolName)) {
           continue;
         }
 
