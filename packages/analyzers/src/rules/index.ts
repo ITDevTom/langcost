@@ -24,4 +24,5 @@ export {
 export { satisfiesRequirements } from "./requirements";
 export { retryPatternsRule } from "./retry-patterns";
 export { toolFailuresRule } from "./tool-failures";
+export { unboundedHistoryRule } from "./unbounded-history";
 export type { ResolvedRuleConfig, WasteRule } from "./types";

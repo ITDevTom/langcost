@@ -10,6 +10,7 @@ import { modelOveruseRule } from "./model-overuse";
 import { oversizedContextRule } from "./oversized-context";
 import { retryPatternsRule } from "./retry-patterns";
 import { toolFailuresRule } from "./tool-failures";
+import { unboundedHistoryRule } from "./unbounded-history";
 import type { ResolvedRuleConfig, WasteRule } from "./types";
 
 /**
@@ -26,6 +27,7 @@ const BUILTIN_RULES: readonly WasteRule[] = [
   duplicateRagRule,
   highOutputRule,
   oversizedContextRule,
+  unboundedHistoryRule,
   cacheExpiryRule,
 ];
 
