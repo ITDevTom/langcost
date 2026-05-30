@@ -13,6 +13,7 @@ export { duplicateRagRule } from "./duplicate-rag";
 export { highOutputRule } from "./high-output";
 export { lowCacheRule } from "./low-cache";
 export { modelOveruseRule } from "./model-overuse";
+export { oversizedContextRule } from "./oversized-context";
 export {
   allRulesEnabledConfig,
   getAllRuleCatalog,
