@@ -45,7 +45,11 @@ export const oversizedContextRule: WasteRule = {
 
       const minInputTokens = Math.max(0, config?.thresholds.minInputTokens ?? 50_000);
       const medianMultiplier = Math.max(1, config?.thresholds.medianMultiplier ?? 3);
-      const traceMedianInput = median(context.llmSpans.map((span) => span.inputTokens ?? 0));
+      const traceMedianInput = median(
+        context.llmSpans
+          .map((span) => span.inputTokens ?? 0)
+          .filter((inputTokens) => inputTokens > 0),
+      );
 
       const reports: WasteReportRecord[] = [];
       for (const span of context.llmSpans) {
