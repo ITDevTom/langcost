@@ -9,6 +9,7 @@ export const duplicateRagRule: WasteRule = {
   title: "Duplicate RAG context",
   description: "Repeated RAG context segments with identical content hashes.",
   defaultEnabled: true,
+  requires: ["spans"],
   detect(contexts): WasteReportRecord[] {
     return contexts.flatMap((context) => {
       const ragSegments = context.segments.filter(

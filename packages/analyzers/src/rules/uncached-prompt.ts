@@ -22,6 +22,7 @@ export const uncachedPromptRule: WasteRule = {
   title: "Uncached prompt",
   description: "Repeated stable prompt segments were sent with little or no cache-read benefit.",
   defaultEnabled: true,
+  requires: ["spans", "cacheTokens"],
   defaultThresholds: {
     minRepeatedTokens: 8_000,
     minOccurrences: 2,

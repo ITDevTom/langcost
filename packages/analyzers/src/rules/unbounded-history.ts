@@ -72,6 +72,7 @@ export const unboundedHistoryRule: WasteRule = {
   title: "Unbounded history",
   description: "Conversation history grows and dominates prompt input across turns.",
   defaultEnabled: true,
+  requires: ["spans"],
   defaultThresholds: {
     minHistoryTokens: 4_000,
     minHistoryShare: 0.4,

@@ -42,6 +42,7 @@ export const unusedToolsRule: WasteRule = {
   title: "Unused tool output",
   description: "Large tool outputs that appear not to influence subsequent model or tool work.",
   defaultEnabled: false,
+  requires: ["spans"],
   defaultThresholds: {
     minToolResultTokens: 2_000,
     maxSimilarity: 0.08,

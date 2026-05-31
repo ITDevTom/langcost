@@ -32,6 +32,7 @@ export const oversizedContextRule: WasteRule = {
   title: "Oversized context",
   description: "LLM turns with unusually large input context compared to trace baseline.",
   defaultEnabled: true,
+  requires: ["spans"],
   defaultThresholds: {
     minInputTokens: 50_000,
     medianMultiplier: 3,
