@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { getSources, type SourceInfo, triggerScan } from "./api/client";
 import { Header } from "./components/layout/Header";
+import { TooltipProvider } from "./components/ui/tooltip";
+import { type ProductMode, resolveInitialMode, sourcesForMode } from "./lib/modes";
+import { AiTraces } from "./pages/AiTraces";
 import { Overview } from "./pages/Overview";
 import { Sessions } from "./pages/Sessions";
 import { Settings } from "./pages/Settings";
@@ -45,6 +48,9 @@ export default function App() {
     return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   });
   const [sources, setSources] = useState<SourceInfo[]>([]);
+  const [mode, setMode] = useState<ProductMode>(() => {
+    return window.localStorage.getItem("langcost-mode") === "ai" ? "ai" : "coding";
+  });
   const [activeSource, setActiveSource] = useState<string | undefined>(() => {
     return window.localStorage.getItem("langcost-source") ?? undefined;
   });
@@ -73,6 +79,11 @@ export default function App() {
     window.localStorage.setItem("langcost-theme", theme);
   }, [theme]);
 
+  // Product palette (coding = orange brand, ai = emerald) is scoped off this attribute in styles.css.
+  useEffect(() => {
+    document.documentElement.dataset.product = mode;
+  }, [mode]);
+
   useEffect(() => {
     if (banner === null || bannerTone !== "info") return;
     const timer = window.setTimeout(() => setBanner(null), 5000);
@@ -94,15 +105,28 @@ export default function App() {
     window.localStorage.setItem("langcost-billing", mode);
   }
 
+  // Switching product (Coding agents ↔ AI agents) re-scopes the source selector to that mode and
+  // moves the active source into it, so the rest of the UI never shows cross-mode data.
+  function handleModeChange(nextMode: ProductMode) {
+    setMode(nextMode);
+    window.localStorage.setItem("langcost-mode", nextMode);
+    const inMode = sourcesForMode(sources, nextMode);
+    if (!activeSource || !inMode.some((s) => s.name === activeSource)) {
+      handleSourceChange(inMode[0]?.name);
+    }
+  }
+
   async function reloadShell() {
     const nextSources = await getSources();
     setSources(nextSources.sources);
 
-    const sourceNames = nextSources.sources.map((s) => s.name);
-    if (activeSource && !sourceNames.includes(activeSource)) {
-      handleSourceChange(sourceNames[0]);
-    } else if (!activeSource && sourceNames.length === 1) {
-      handleSourceChange(sourceNames[0]);
+    // Keep the active source pinned to the current mode's sources.
+    const inMode = sourcesForMode(nextSources.sources, mode);
+    const names = inMode.map((s) => s.name);
+    if (activeSource && !names.includes(activeSource)) {
+      handleSourceChange(names[0]);
+    } else if (!activeSource && names.length >= 1) {
+      handleSourceChange(names[0]);
     }
 
     setRefreshToken((current) => current + 1);
@@ -121,12 +145,21 @@ export default function App() {
 
         setSources(nextSources.sources);
 
-        const sourceNames = nextSources.sources.map((s) => s.name);
+        // Resolve the product mode against what actually has data, then pick a source within it.
+        const initialMode = resolveInitialMode(
+          nextSources.sources,
+          window.localStorage.getItem("langcost-mode"),
+        );
+        setMode(initialMode);
+        window.localStorage.setItem("langcost-mode", initialMode);
+
+        const inMode = sourcesForMode(nextSources.sources, initialMode);
+        const names = inMode.map((s) => s.name);
         const saved = window.localStorage.getItem("langcost-source") ?? undefined;
-        if (saved && sourceNames.includes(saved)) {
+        if (saved && names.includes(saved)) {
           setActiveSource(saved);
-        } else if (sourceNames.length >= 1 && sourceNames[0]) {
-          const pick = sourceNames[0];
+        } else if (names.length >= 1 && names[0]) {
+          const pick = names[0];
           setActiveSource(pick);
           window.localStorage.setItem("langcost-source", pick);
         }
@@ -149,7 +182,11 @@ export default function App() {
     };
   }, []);
 
-  const hasData = sources.length > 0;
+  const visibleSources = useMemo(() => sourcesForMode(sources, mode), [sources, mode]);
+  const hasData = visibleSources.length > 0;
+  // Subscription vs API billing only applies to coding agents; production traces are always
+  // usage-priced, so AI mode forces "api".
+  const effectiveBilling = mode === "ai" ? "api" : billingMode;
   const route = useMemo(() => parseRoute(pathname), [pathname]);
   const activePath = route.page === "trace" || route.page === "traces" ? "/" : pathname;
 
@@ -202,58 +239,70 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen">
-      <Header
-        currentPath={activePath}
-        onNavigate={navigate}
-        onRefresh={() => void handleRefresh()}
-        refreshing={refreshing}
-        theme={theme}
-        onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
-        sources={sources}
-        activeSource={activeSource}
-        onSourceChange={handleSourceChange}
-        billingMode={billingMode}
-        onBillingModeChange={handleBillingModeChange}
-      />
+    <TooltipProvider delayDuration={200}>
+      <div className="min-h-screen">
+        <Header
+          currentPath={activePath}
+          onNavigate={navigate}
+          onRefresh={() => void handleRefresh()}
+          refreshing={refreshing}
+          theme={theme}
+          onToggleTheme={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+          mode={mode}
+          onModeChange={handleModeChange}
+          sources={visibleSources}
+          activeSource={activeSource}
+          onSourceChange={handleSourceChange}
+          billingMode={billingMode}
+          onBillingModeChange={handleBillingModeChange}
+        />
 
-      <main className="page-shell">
-        {refreshing ? (
-          <div className="banner banner--info flex items-center gap-3">
-            <span className="spinner" aria-hidden="true" />
-            <span>Scanning {activeSource ?? "configured source"} for new traces…</span>
-          </div>
-        ) : banner ? (
-          <div className={`banner ${bannerTone === "error" ? "banner--error" : "banner--info"}`}>
-            {banner}
-          </div>
-        ) : null}
+        <main className="page-shell">
+          {refreshing ? (
+            <div className="banner banner--info flex items-center gap-3">
+              <span className="spinner" aria-hidden="true" />
+              <span>Scanning {activeSource ?? "configured source"} for new traces…</span>
+            </div>
+          ) : banner ? (
+            <div className={`banner ${bannerTone === "error" ? "banner--error" : "banner--info"}`}>
+              {banner}
+            </div>
+          ) : null}
 
-        {route.page === "traces" ? (
-          <Sessions
-            refreshToken={refreshToken}
-            onNavigate={navigate}
-            source={activeSource}
-            billingMode={billingMode}
-          />
-        ) : null}
-        {route.page === "overview" ? (
-          <Overview
-            refreshToken={refreshToken}
-            onNavigate={navigate}
-            source={activeSource}
-            billingMode={billingMode}
-          />
-        ) : null}
-        {route.page === "settings" ? <Settings onShellRefresh={reloadShell} /> : null}
-        {route.page === "trace" ? (
-          <TraceDetail
-            traceId={route.traceId}
-            refreshToken={refreshToken}
-            onBack={() => navigate("/")}
-          />
-        ) : null}
-      </main>
-    </div>
+          {mode === "ai" && (route.page === "traces" || route.page === "trace") ? (
+            <AiTraces
+              refreshToken={refreshToken}
+              source={activeSource}
+              selectedTraceId={route.page === "trace" ? route.traceId : undefined}
+              onSelect={(id) => navigate(`/traces/${encodeURIComponent(id)}`)}
+            />
+          ) : null}
+          {mode !== "ai" && route.page === "traces" ? (
+            <Sessions
+              refreshToken={refreshToken}
+              onNavigate={navigate}
+              source={activeSource}
+              billingMode={effectiveBilling}
+            />
+          ) : null}
+          {route.page === "overview" ? (
+            <Overview
+              refreshToken={refreshToken}
+              onNavigate={navigate}
+              source={activeSource}
+              billingMode={effectiveBilling}
+            />
+          ) : null}
+          {route.page === "settings" ? <Settings mode={mode} onShellRefresh={reloadShell} /> : null}
+          {mode !== "ai" && route.page === "trace" ? (
+            <TraceDetail
+              traceId={route.traceId}
+              refreshToken={refreshToken}
+              onBack={() => navigate("/")}
+            />
+          ) : null}
+        </main>
+      </div>
+    </TooltipProvider>
   );
 }

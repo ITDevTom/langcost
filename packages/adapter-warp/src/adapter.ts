@@ -18,6 +18,7 @@ export const warpAdapter: IAdapter<Db> = {
     version: "0.1.0",
     description: "Ingest Warp AI session data from warp.sqlite into langcost.",
     sourceType: "local",
+    product: "coding",
   },
 
   async validate(options?: IngestOptions) {

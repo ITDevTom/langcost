@@ -53,6 +53,7 @@ export const clineAdapter: IAdapter<Db> = {
     version: "0.1.0",
     description: "Ingest Cline VS Code task history from local disk into langcost SQLite.",
     sourceType: "local",
+    product: "coding",
   },
 
   async validate(options?: IngestOptions) {

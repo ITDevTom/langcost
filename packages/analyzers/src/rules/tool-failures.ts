@@ -1,31 +1,13 @@
 import type { SpanRecord, WasteReportRecord } from "@langcost/db";
 
 import { getSpanCost, getSpanTotalTokens } from "../context";
-import { createWasteReport, severityFromCost } from "./shared";
+import {
+  createWasteReport,
+  getCommandFirstToken,
+  RETRY_WINDOW_MS,
+  severityFromCost,
+} from "./shared";
 import type { WasteRule } from "./types";
-
-const RETRY_WINDOW_MS = 5 * 60 * 1000;
-
-// For shell tool calls (Bash, run_command, etc.) the toolInput holds a command — either
-// raw or as JSON ({command:"..."}). Extract the leading executable token so we can compare
-// "npm test" to "npm test 2>&1" without false-matching unrelated Bash calls.
-function getCommandFirstToken(toolInput: string | null | undefined): string | null {
-  if (!toolInput) return null;
-  let command = toolInput;
-  try {
-    const parsed = JSON.parse(toolInput);
-    if (
-      parsed &&
-      typeof parsed === "object" &&
-      typeof (parsed as { command?: unknown }).command === "string"
-    ) {
-      command = (parsed as { command: string }).command;
-    }
-  } catch {}
-  const trimmed = command.trim();
-  if (trimmed.length === 0) return null;
-  return trimmed.split(/\s+/)[0] ?? null;
-}
 
 // A tool failure is only "waste" if the agent had to spend additional model work recovering.
 // Recovery looks like: a later tool span of the same tool name within RETRY_WINDOW_MS, and —

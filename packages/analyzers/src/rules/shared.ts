@@ -131,3 +131,30 @@ export function getOutputCostUsd(span: SpanRecord): number {
 
   return getSpanCost(span) * ((span.outputTokens ?? 0) / totalTokens);
 }
+
+/** Window in which a later same-tool call counts as a retry of an earlier failure. */
+export const RETRY_WINDOW_MS = 5 * 60 * 1000;
+
+/**
+ * For shell tool calls (Bash, run_command, …) the toolInput holds a command — raw or as JSON
+ * ({command:"..."}). Extract the leading executable token so we can compare "npm test" to
+ * "npm test 2>&1" without false-matching unrelated Bash calls. Shared by the tool-failure waste
+ * rule and the tool-cascade fault rule so retry/recovery detection uses one battle-tested matcher.
+ */
+export function getCommandFirstToken(toolInput: string | null | undefined): string | null {
+  if (!toolInput) return null;
+  let command = toolInput;
+  try {
+    const parsed = JSON.parse(toolInput);
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof (parsed as { command?: unknown }).command === "string"
+    ) {
+      command = (parsed as { command: string }).command;
+    }
+  } catch {}
+  const trimmed = command.trim();
+  if (trimmed.length === 0) return null;
+  return trimmed.split(/\s+/)[0] ?? null;
+}

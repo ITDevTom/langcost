@@ -88,6 +88,7 @@ describe("@langcost/api", () => {
     type AdapterEntryBase = {
       name: string;
       label: string;
+      product: "coding" | "ai";
       traceCount: number;
       lastScanAt: string | null;
     };
@@ -109,6 +110,7 @@ describe("@langcost/api", () => {
       expect(typeof entry.label).toBe("string");
       expect(entry.label.length).toBeGreaterThan(0);
       expect(typeof entry.traceCount).toBe("number");
+      expect(["coding", "ai"]).toContain(entry.product);
 
       if (entry.installed) {
         expect(typeof entry.version).toBe("string");
@@ -124,6 +126,14 @@ describe("@langcost/api", () => {
     // In the workspace dev environment every known adapter resolves via the
     // workspace fallback in tryLoadAdapter, so all of them should report installed.
     expect(payload.adapters.every((entry) => entry.installed)).toBe(true);
+
+    // Product flag is end-to-end: installed adapters report their self-declared meta.product.
+    // Langfuse is the AI-agents adapter; the local coding-agent adapters report "coding".
+    const productByName = new Map(payload.adapters.map((entry) => [entry.name, entry.product]));
+    expect(productByName.get("langfuse")).toBe("ai");
+    for (const coding of ["openclaw", "claude-code", "warp", "cline", "codex"]) {
+      expect(productByName.get(coding)).toBe("coding");
+    }
   });
 
   it("returns a friendly error when a scan is triggered before settings are saved", async () => {

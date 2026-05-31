@@ -1,4 +1,4 @@
-import { getRuleCatalog, runPipeline, wasteDetector } from "@langcost/analyzers";
+import { faultDetector, getAllRuleCatalog, runPipeline, wasteDetector } from "@langcost/analyzers";
 import type { RulesConfig } from "@langcost/core";
 import { createSettingsRepository, createTraceRepository } from "@langcost/db";
 import { Hono } from "hono";
@@ -51,7 +51,7 @@ export function createRulesRoute(options: { dbPath?: string } = {}) {
   route.get("/", async (c) => {
     const payload = await withDb(options.dbPath, (db) => {
       const config = createSettingsRepository(db).getRulesConfig() ?? { rules: {} };
-      return { catalog: getRuleCatalog(), config };
+      return { catalog: getAllRuleCatalog(), config };
     });
     return c.json(payload);
   });
@@ -81,7 +81,7 @@ export function createRulesRoute(options: { dbPath?: string } = {}) {
         return { tracesAnalyzed: 0, findingsCount: 0 };
       }
 
-      const pipeline = await runPipeline(db, [wasteDetector], { traceIds });
+      const pipeline = await runPipeline(db, [wasteDetector, faultDetector], { traceIds });
       return { tracesAnalyzed: pipeline.tracesAnalyzed, findingsCount: pipeline.findingsCount };
     });
 

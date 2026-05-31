@@ -1,4 +1,4 @@
-import { getRuleCatalog, runPipeline, wasteDetector } from "@langcost/analyzers";
+import { faultDetector, getAllRuleCatalog, runPipeline, wasteDetector } from "@langcost/analyzers";
 import type { RuleConfigEntry, RulesConfig } from "@langcost/core";
 import {
   createDb,
@@ -24,7 +24,7 @@ async function reanalyzeStoredTraces(
   if (traceIds.length === 0) {
     return { tracesAnalyzed: 0, findings: 0 };
   }
-  const result = await runPipeline(db, [wasteDetector], { traceIds });
+  const result = await runPipeline(db, [wasteDetector, faultDetector], { traceIds });
   return { tracesAnalyzed: result.tracesAnalyzed, findings: result.findingsCount };
 }
 
@@ -37,7 +37,7 @@ function writeConfig(db: Db, config: RulesConfig): void {
 }
 
 function knownRuleIds(): Set<string> {
-  return new Set(getRuleCatalog().map((entry) => entry.id));
+  return new Set(getAllRuleCatalog().map((entry) => entry.id));
 }
 
 function requireKnownRule(ruleId: string, runtime: CliRuntime, palette: Palette): boolean {
@@ -51,7 +51,7 @@ function requireKnownRule(ruleId: string, runtime: CliRuntime, palette: Palette)
 
 function printList(db: Db, runtime: CliRuntime, palette: Palette): void {
   const config = loadConfig(db);
-  const catalog = getRuleCatalog();
+  const catalog = getAllRuleCatalog();
 
   const rows = catalog.map((entry) => {
     const ruleConfig = config.rules[entry.id];
@@ -67,19 +67,19 @@ function printList(db: Db, runtime: CliRuntime, palette: Palette): void {
             .map(([key, value]) => `${key}=${value}`)
             .join(" ")
         : "-";
-    return { id: entry.id, tier: `T${entry.tier}`, enabled, scope, thresholds };
+    return { id: entry.id, kind: entry.kind, tier: `T${entry.tier}`, enabled, scope, thresholds };
   });
 
   const idWidth = Math.max(4, ...rows.map((row) => row.id.length));
   const scopeWidth = Math.max(5, ...rows.map((row) => row.scope.length));
 
   runtime.io.write(
-    `${palette.bold(`${"RULE".padEnd(idWidth)}  TIER  ENABLED  ${"SCOPE".padEnd(scopeWidth)}  THRESHOLDS`)}\n`,
+    `${palette.bold(`${"RULE".padEnd(idWidth)}  KIND   TIER  ENABLED  ${"SCOPE".padEnd(scopeWidth)}  THRESHOLDS`)}\n`,
   );
   for (const row of rows) {
     const enabledCell = row.enabled ? palette.green("yes    ") : palette.dim("no     ");
     runtime.io.write(
-      `${row.id.padEnd(idWidth)}  ${row.tier.padEnd(4)}  ${enabledCell}  ${row.scope.padEnd(scopeWidth)}  ${row.thresholds}\n`,
+      `${row.id.padEnd(idWidth)}  ${row.kind.padEnd(5)}  ${row.tier.padEnd(4)}  ${enabledCell}  ${row.scope.padEnd(scopeWidth)}  ${row.thresholds}\n`,
     );
   }
 
@@ -118,7 +118,7 @@ export async function runRulesCommand(
 
     if (options.action === "apply") {
       const { tracesAnalyzed, findings } = await reanalyzeStoredTraces(db);
-      runtime.io.write(`Re-analyzed ${tracesAnalyzed} trace(s); ${findings} waste finding(s).\n`);
+      runtime.io.write(`Re-analyzed ${tracesAnalyzed} trace(s); ${findings} finding(s).\n`);
       return 0;
     }
 
@@ -172,7 +172,7 @@ export async function runRulesCommand(
     writeConfig(db, config);
     const { tracesAnalyzed, findings } = await reanalyzeStoredTraces(db);
     runtime.io.write(
-      `${summary} Re-analyzed ${tracesAnalyzed} trace(s); ${findings} waste finding(s).\n`,
+      `${summary} Re-analyzed ${tracesAnalyzed} trace(s); ${findings} finding(s).\n`,
     );
     return 0;
   } catch (error) {

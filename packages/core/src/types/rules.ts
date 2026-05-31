@@ -28,9 +28,13 @@ export interface RulesConfig {
   rules: Record<string, RuleConfigEntry>;
 }
 
+/** Whether a catalog entry is a cost (waste) rule or a fault-attribution rule. */
+export type RuleKind = "cost" | "fault";
+
 /** Serializable rule metadata surfaced to the CLI / API / dashboard. */
 export interface RuleCatalogEntry {
   id: string;
+  kind: RuleKind;
   tier: 1 | 2;
   title: string;
   description: string;

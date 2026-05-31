@@ -1,6 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
-import { allRulesEnabledConfig, getRuleCatalog, resolveRules } from "../src/index";
+import {
+  allRulesEnabledConfig,
+  getAllRuleCatalog,
+  getRuleCatalog,
+  resolveFaultRules,
+  resolveRules,
+} from "../src/index";
 
 describe("rule registry", () => {
   it("exposes catalog metadata for every built-in rule", () => {
@@ -42,12 +48,17 @@ describe("rule registry", () => {
     expect(active[0]?.resolved.thresholds.minRepeats).toBe(9);
   });
 
-  it("allRulesEnabledConfig enables every rule against all adapters", () => {
+  it("allRulesEnabledConfig enables every rule (cost + fault) against all adapters", () => {
     const config = allRulesEnabledConfig();
-    const ids = getRuleCatalog().map((entry) => entry.id);
-    for (const id of ids) {
-      expect(config.rules[id]).toEqual({ enabled: true, sources: "*" });
+    const all = getAllRuleCatalog();
+    // Must include the fault rules, not just the cost rules.
+    expect(all.some((entry) => entry.kind === "fault")).toBe(true);
+    for (const entry of all) {
+      expect(config.rules[entry.id]).toEqual({ enabled: true, sources: "*" });
     }
-    expect(resolveRules(config)).toHaveLength(ids.length);
+    // Cost + fault resolvers together cover the whole catalog.
+    const costCount = getRuleCatalog().length;
+    expect(resolveRules(config)).toHaveLength(costCount);
+    expect(resolveFaultRules(config)).toHaveLength(all.length - costCount);
   });
 });

@@ -27,5 +27,9 @@ SPEC.md
 PRODUCT.md
 TODO.md
 RULESETS.md
+agent_run_analysis.md
+langfuse_implementation.md
+dashboard_redesign.md
+fault_attribution.md
 .github/CONTRIBUTING.md
 UI.md

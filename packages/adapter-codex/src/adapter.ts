@@ -51,6 +51,7 @@ export const codexAdapter: IAdapter<Db> = {
     version: "0.1.0",
     description: "Ingest OpenAI Codex CLI rollouts from local disk into langcost SQLite.",
     sourceType: "local",
+    product: "coding",
   },
 
   async validate(options?: IngestOptions) {

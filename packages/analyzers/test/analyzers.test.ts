@@ -213,9 +213,14 @@ describe("@langcost/analyzers", () => {
     expect(result.analyzerResults.map((entry) => entry.analyzerName)).toEqual([
       "cost-analyzer",
       "waste-detector",
+      "fault-detector",
     ]);
-    expect(runs).toHaveLength(2);
-    expect(runs.map((run) => run.analyzerName)).toEqual(["cost-analyzer", "waste-detector"]);
+    expect(runs).toHaveLength(3);
+    expect(runs.map((run) => run.analyzerName)).toEqual([
+      "cost-analyzer",
+      "waste-detector",
+      "fault-detector",
+    ]);
     expect(runs.every((run) => run.status === "complete")).toBe(true);
   });
 

@@ -40,6 +40,11 @@
         "generic"
       ]
     },
+    "packages/adapter-langfuse": {
+      "adapters": [
+        "generic"
+      ]
+    },
     "packages/adapter-openclaw": {
       "adapters": [
         "generic"
@@ -137,6 +142,13 @@
       "reason": "OpenAI Codex CLI adapter — ingests ~/.codex/sessions rollout files"
     },
     {
+      "name": "adapter_langfuse",
+      "kind": "adapter",
+      "glob": "packages/adapter-langfuse/src/**/*.ts",
+      "symbolPattern": "^export\\s+",
+      "reason": "Langfuse adapter — ingests production agent traces from the Langfuse observations API"
+    },
+    {
       "name": "api_routes",
       "kind": "route",
       "glob": "apps/api/src/routes/**/*.ts",
@@ -209,19 +221,26 @@
     "excludeTypeOnlyImports": true
   },
   "_meta": {
-    "generatedAt": "2026-05-17T17:23:17.089Z",
+    "generatedAt": "2026-05-31T14:24:08.229Z",
     "lastModifiedBy": "kk_init",
     "projectName": "langcost"
   },
   "ignoreCoverage": [
     "packages/core/src/index.ts",
+    "packages/core/src/interfaces/adapter.ts",
     "packages/core/src/types/index.ts",
     "packages/core/src/types/rules.ts",
     "packages/cli/src/types.ts",
     "packages/adapter-codex/src/index.ts",
     "packages/adapter-codex/src/types.ts",
+    "packages/adapter-langfuse/src/index.ts",
+    "packages/adapter-langfuse/src/types.ts",
+    "packages/analyzers/src/index.ts",
     "packages/analyzers/src/rules/index.ts",
     "packages/analyzers/src/rules/types.ts",
-    "scripts/release.ts"
+    "packages/analyzers/src/rules/fault/types.ts",
+    "packages/core/src/types/analysis.ts",
+    "scripts/release.ts",
+    "scripts/seed-sample-traces.ts"
   ]
 }

@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 
 import type { Db } from "../client";
 import { faultReports } from "../schema";
@@ -30,13 +30,37 @@ export function createFaultReportRepository(db: Db) {
             faultSpanId: row.faultSpanId,
             rootCauseSpanId: row.rootCauseSpanId,
             faultType: row.faultType,
+            severity: row.severity,
+            confidence: row.confidence,
             description: row.description,
+            recommendation: row.recommendation,
             cascadeDepth: row.cascadeDepth,
             affectedSpanIds: row.affectedSpanIds,
             detectedAt: row.detectedAt,
           },
         })
         .run();
+    },
+    deleteByTraceIds(traceIds: string[]): void {
+      if (traceIds.length === 0) {
+        return;
+      }
+      const [firstTraceId] = traceIds;
+      db.delete(faultReports)
+        .where(
+          traceIds.length === 1 && firstTraceId
+            ? eq(faultReports.traceId, firstTraceId)
+            : inArray(faultReports.traceId, traceIds),
+        )
+        .run();
+    },
+    list(): FaultReportRow[] {
+      return db
+        .select()
+        .from(faultReports)
+        .orderBy(desc(faultReports.detectedAt))
+        .all()
+        .map(fromRow);
     },
     listByTraceId(traceId: string): FaultReportRow[] {
       return db

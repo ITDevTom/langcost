@@ -54,13 +54,23 @@ export type FaultType =
   | "timeout"
   | "unknown";
 
+/**
+ * How sure we are of an attribution. Automated multi-agent fault attribution caps around ~33%
+ * accuracy, so this is surfaced honestly: `high` for first-class signals (status/errorMessage),
+ * `low` for structural proxies/heuristics.
+ */
+export type FaultConfidence = "high" | "medium" | "low";
+
 export interface FaultReport {
   id: string;
   traceId: string;
   faultSpanId: string;
   rootCauseSpanId?: string;
   faultType: FaultType;
+  severity: Severity;
+  confidence: FaultConfidence;
   description: string;
+  recommendation: string;
   cascadeDepth: number;
   affectedSpanIds: string[];
   detectedAt: Date;

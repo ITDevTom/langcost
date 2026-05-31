@@ -1,4 +1,5 @@
 import type {
+  FaultReportRecord,
   MessageRecord,
   SegmentRecord,
   SpanRecord,
@@ -117,10 +118,17 @@ export function buildOverviewPayload(
   traces: TraceRecord[],
   wasteReports: WasteReportRecord[],
   turnsByTraceId?: Map<string, number>,
+  faultReports: FaultReportRecord[] = [],
 ) {
   const actionableWasteReports = getActionableWasteReports(wasteReports);
   const totalCostUsd = sumBy(traces, (trace) => trace.totalCostUsd);
   const tracesWithWaste = new Set(actionableWasteReports.map((report) => report.traceId)).size;
+
+  const tracesWithFaults = new Set(faultReports.map((report) => report.traceId)).size;
+  const topFaultTypes = [...groupBy(faultReports, (report) => report.faultType).entries()]
+    .map(([type, reports]) => ({ type, count: reports.length }))
+    .sort((left, right) => right.count - left.count)
+    .slice(0, 5);
 
   // Cap waste per trace at actual trace cost to avoid waste > cost from overlapping rules
   const traceCostById = new Map(traces.map((trace) => [trace.id, trace.totalCostUsd]));
@@ -177,6 +185,9 @@ export function buildOverviewPayload(
     wastePercentage: totalCostUsd > 0 ? (totalWastedUsd / totalCostUsd) * 100 : 0,
     tracesWithWaste,
     topWasteCategories,
+    faultCount: faultReports.length,
+    tracesWithFaults,
+    topFaultTypes,
     costByDay,
     costByModel,
     // Success rate
@@ -340,6 +351,7 @@ export function serializeTraceSummary(
   trace: TraceRecord,
   wasteReports: WasteReportRecord[],
   spanCount: number,
+  faultCount = 0,
 ) {
   const actionableWasteReports = getActionableWasteReports(wasteReports);
   const rawWaste = sumBy(actionableWasteReports, (report) => report.wastedCostUsd);
@@ -348,6 +360,7 @@ export function serializeTraceSummary(
     spanCount,
     wasteUsd: Math.min(rawWaste, trace.totalCostUsd),
     wasteCount: actionableWasteReports.length,
+    faultCount,
   };
 }
 
@@ -356,6 +369,7 @@ export function normalizeTraceDetail(
   spans: SpanRecord[],
   segments: SegmentRecord[],
   wasteReports: WasteReportRecord[],
+  faultReports: FaultReportRecord[] = [],
 ) {
   return {
     trace: serializeTraceSummary(trace, wasteReports, spans.length),
@@ -363,6 +377,7 @@ export function normalizeTraceDetail(
     segments,
     costBreakdown: buildCostBreakdown(trace, segments, wasteReports),
     wasteReports,
+    faultReports,
     topSpans: getTopSpans(spans, 5),
   };
 }

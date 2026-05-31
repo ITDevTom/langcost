@@ -8,7 +8,7 @@
     "apps/*"
   ],
   "scripts": {
-    "build": "bun run --cwd packages/core build && bun run --cwd packages/db build && bun run --cwd packages/analyzers build && bun run --cwd packages/adapter-openclaw build && bun run --cwd packages/adapter-claude-code build && bun run --cwd packages/adapter-warp build && bun run --cwd packages/adapter-cline build && bun run --cwd packages/adapter-codex build",
+    "build": "bun run --cwd packages/core build && bun run --cwd packages/db build && bun run --cwd packages/analyzers build && bun run --cwd packages/adapter-openclaw build && bun run --cwd packages/adapter-claude-code build && bun run --cwd packages/adapter-warp build && bun run --cwd packages/adapter-cline build && bun run --cwd packages/adapter-codex build && bun run --cwd packages/adapter-langfuse build",
     "test": "bun test",
     "test:core": "bun test packages/core",
     "test:db": "bun test packages/db",
