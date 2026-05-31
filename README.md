@@ -5,9 +5,9 @@
 </h1>
 
 <p align="center">
-  <strong>Cost intelligence for AI agents.</strong>
+  <strong>Cost &amp; fault intelligence for AI agents.</strong>
   <br/>
-  See where your tokens go. Find the waste. Fix it.
+  See where your tokens go. Find the waste. Trace failures to their root cause.
 </p>
 
 <p align="center">
@@ -22,7 +22,7 @@
   <img src="https://img.shields.io/badge/license-AGPL--3.0-blue?style=flat-square" alt="License" />
   <img src="https://img.shields.io/badge/runtime-Bun-f472b6?style=flat-square&logo=bun&logoColor=fff" alt="Bun" />
   <img src="https://img.shields.io/badge/lang-TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=fff" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/models-22_supported-43c78a?style=flat-square" alt="22 Models" />
+  <img src="https://img.shields.io/badge/models-36_supported-43c78a?style=flat-square" alt="36 Models" />
 </p>
 
 <br/>
@@ -133,6 +133,8 @@ LangCost uses a plugin architecture — adapters translate agent-specific data i
 | **OpenClaw** | `@langcost/adapter-openclaw` | `~/.openclaw/` | JSONL session logs from OpenClaw agents |
 | **Warp** | `@langcost/adapter-warp` | `~/Library/Group Containers/.../warp.sqlite` | Oz agent sessions from Warp's local SQLite database |
 | **Cline** | `@langcost/adapter-cline` | `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/` | VS Code extension task history from Cline |
+| **Codex** | `@langcost/adapter-codex` | `~/.codex/sessions/` | Rollout session files from the OpenAI Codex CLI |
+| **Langfuse** | `@langcost/adapter-langfuse` | Langfuse API (`--api-key`) | Production agent traces from a Langfuse project — the **AI agents** view |
 
 Compatibility note: `@langcost/adapter-cline` reads Cline's stored task usage and preserves the provider/model recorded by Cline, including direct Cline model usage and OpenRouter-backed usage observed in local data.
 
@@ -150,8 +152,8 @@ Any npm package named `@langcost/adapter-<name>` that exports a default implemen
 
 ```bash
 # The CLI discovers your adapter automatically — no registration needed
-npm install -g @langcost/adapter-langfuse
-langcost scan --source langfuse
+npm install -g @langcost/adapter-myframework
+langcost scan --source myframework
 ```
 
 See [Contributing](#contributing) for the full adapter spec.
@@ -175,11 +177,25 @@ Rules that find wasted spend in your sessions. Detection is **opt-in** — you e
 | 🟡 | **Retry Patterns** | User re-prompting because the agent failed — 3 similar messages in a row, agent struggling |
 | 🟠 | **High Output** | Spans with output 3x+ the session average — one response used 4,200 tokens when peers averaged 380 |
 | 🟢 | **Low Cache** | Prompt caching disabled or underused — paying full input price on every call |
+| 🟢 | **Cache Expiry** | A prompt cache that lapsed between turns — an idle gap expired the cache, so a large context was re-billed at full input price |
 | 🔵 | **Model Insight** | Flags expensive model usage — 100% Opus usage, helps you decide when cheaper models suffice |
 
 Every finding includes the **dollar amount wasted** and a **specific recommendation** to fix it.
 
 **Choosing rules:** open `langcost dashboard` → **Adapters**, expand an adapter's *Waste rules* section, check the rules you want, and **Save & analyze**. The CLI mirrors this — `langcost rules enable/disable/scope/set` (see [CLI Reference](#cli-reference)). Changing the selection re-analyzes your already-ingested traces; no re-scan needed.
+
+<br/>
+
+### Fault Attribution
+
+Cost tells you *what* you spent; fault attribution tells you *why a run failed* — and pins the **root cause**, not just the symptom. When a trace errors, LangCost walks the span tree back to the **first failing origin** and collapses the whole cascade into one finding ("1 root cause → N affected spans"), so you don't wade through a wall of red. Every report carries a **confidence** score, because attribution is heuristic.
+
+| | Rule | What it catches |
+|:---:|------|-------------|
+| 🔴 | **Tool / API failure cascade** | A tool or model error that doomed the run — attributed to the first failing call, with the downstream cascade and a `tool_failure` / `timeout` / `model_error` classification |
+| 🟠 | **Silent tool misuse** | A tool that *reported success* but returned empty or invalid output that a later step consumed — the "every span is green but the answer is wrong" case status dashboards miss |
+
+Like waste rules, fault detection is **opt-in and per-adapter**. Faults surface in the trace list, the overview, and inline in the execution tree (⊙ root cause, ▲ affected span).
 
 <br/>
 
@@ -205,13 +221,12 @@ Read exactly what the agent did, which tools it called, what failed, and what ea
 
 ### Dashboard
 
-A local web UI at `localhost:3737`:
+A local web UI at `localhost:3737` with a header switch between two products:
 
-- **Trace table** — all sessions with cost, waste, status. Sortable and filterable.
-- **Expandable rows** — click to see waste findings + execution timeline inline
-- **Cost overview** — total spend, waste percentage, cost-over-time chart
-- **Model insights** — which models you're using and what they cost
-- **Recommendations** — prioritized list of what to fix first
+- **Coding agents** — your local dev-tool sessions (Claude Code, Codex, Warp, Cline, OpenClaw) in an expandable trace table.
+- **AI agents** — production traces (Langfuse, …) in a master-detail explorer: a trace list on the left, and on the right a **latency-waterfall span tree** with per-span cost, cache, tool I/O, and fault highlighting.
+
+Across both: a cost overview with waste % and fault counts, model insights, prioritized recommendations, and per-adapter rule selection on the **Adapters** page.
 
 <br/>
 
@@ -243,15 +258,15 @@ langcost report --format json
 
 <br/>
 
-### 22 Models Supported
+### 36 Models Supported
 
 Built-in pricing for Anthropic, OpenAI, Google, DeepSeek, and Mistral:
 
 | Provider | Models |
 |----------|--------|
-| **Anthropic** | Opus 4, Sonnet 4, Haiku 4.5, Haiku 3.5 |
-| **OpenAI** | GPT-4.1, GPT-4.1-mini, GPT-4.1-nano, GPT-4o, GPT-4o-mini, o3, o3-mini, o4-mini |
-| **Google** | Gemini 2.5 Pro, 2.5 Flash, 2.0 Flash, 2.0 Flash Lite |
+| **Anthropic** | Opus 4.8, Opus 4.7, Opus 4.6, Opus 4, Sonnet 4, Haiku 4.5, Haiku 3.5 |
+| **OpenAI** | GPT-5.5, 5.5 Pro, 5.4, 5.4-mini, 5.4-nano, 5.4 Pro, 5.3-codex, GPT-4.1, 4.1-mini, 4.1-nano, GPT-4o, 4o-mini, o3, o3-mini, o4-mini |
+| **Google** | Gemini 3.1 Pro, 3 Flash, 3.1 Flash Lite, 2.5 Pro, 2.5 Flash, 2.5 Flash Lite, 2.0 Flash, 2.0 Flash Lite |
 | **DeepSeek** | V3 (chat), R1 (reasoner) |
 | **Mistral** | Large, Small, Codestral |
 
@@ -274,7 +289,7 @@ Using a self-hosted or unlisted model? Costs show as $0 but all token counts and
     └─────┬────┘
           ▼
     ┌──────────┐
-    │  analyze  │  Run the waste rules you enabled (source-agnostic, opt-in)
+    │  analyze  │  Run the cost + fault rules you enabled (source-agnostic, opt-in)
     └─────┬────┘
           ▼
     ┌──────────┐
@@ -381,9 +396,9 @@ scoping, or setting a threshold re-analyzes your already-ingested traces automat
 
 | | Feature | Description |
 |:---:|---------|-------------|
-| 🧭 | **Fault Attribution** | Trace failures backwards to find the root cause — not just which step errored, but which upstream agent caused it |
 | 🧩 | **More Waste Rules** | Unused tool schemas, duplicate RAG chunks, unbounded conversation history, uncached system prompts |
-| 🔌 | **More Adapters** | Langfuse, LangSmith, custom JSONL formats — bring your own traces |
+| 🧭 | **More Fault Rules** | Loops / non-termination, empty-retrieval hallucination, and coordination failures across multi-agent handoffs |
+| 🔌 | **More Adapters** | LangSmith, OpenTelemetry, custom JSONL formats — bring your own traces |
 | 🏷️ | **Custom Model Pricing** | Set input/output/cache prices for self-hosted and unlisted models |
 
 <br/>
@@ -394,9 +409,11 @@ scoping, or setting a threshold re-analyzes your already-ingested traces automat
 
 ## Contributing
 
-LangCost has a plugin architecture. Three ways to contribute:
+LangCost has a plugin architecture. See **[CONTRIBUTING.md](./CONTRIBUTING.md)** for setup, the architecture rules, and the full guide. The common shapes:
 
 > **🧩 Add a waste rule** — export a `WasteRule` from `packages/analyzers/src/rules/` (`id`, `title`, `description`, `defaultEnabled`, optional `requires`, and a `detect(contexts)`), then register it in `rules/registry.ts`. Copy an existing rule as a starting point. Rules are source-agnostic and never import adapters; users opt into them per adapter.
+
+> **🧭 Add a fault rule** — export a `FaultRule` from `packages/analyzers/src/rules/fault/` and register it in `rules/fault/registry.ts`. Attribute the root cause + cascade (not just the symptom) and set an honest `confidence`; see `fault/tool-cascade.ts`.
 
 > **💲 Update model pricing** — edit `packages/core/src/pricing/providers.ts`. Add new models or fix outdated prices.
 
@@ -429,7 +446,7 @@ LangCost has a plugin architecture. Three ways to contribute:
   </tr>
   <tr>
     <td><strong>Dashboard</strong></td>
-    <td><a href="https://react.dev"><img src="https://img.shields.io/badge/React-61dafb?style=flat-square&logo=react&logoColor=000" alt="React" /></a> + Vite + Tailwind + Recharts</td>
+    <td><a href="https://react.dev"><img src="https://img.shields.io/badge/React-61dafb?style=flat-square&logo=react&logoColor=000" alt="React" /></a> + Vite + Tailwind + Radix UI + Recharts</td>
   </tr>
 </table>
 
