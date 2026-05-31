@@ -3,6 +3,7 @@ import type { Db } from "@langcost/db";
 import { createAnalysisRunRepository } from "@langcost/db";
 
 import { costAnalyzer } from "./cost-analyzer";
+import { faultDetector } from "./fault-detector";
 import { wasteDetector } from "./waste-detector";
 
 export interface PipelineAnalyzerResult {
@@ -17,7 +18,7 @@ export interface PipelineResult {
   analyzerResults: PipelineAnalyzerResult[];
 }
 
-export const defaultAnalyzers: IAnalyzer<Db>[] = [costAnalyzer, wasteDetector];
+export const defaultAnalyzers: IAnalyzer<Db>[] = [costAnalyzer, wasteDetector, faultDetector];
 
 export async function runPipeline(
   db: Db,

@@ -115,6 +115,18 @@ export function Overview({ refreshToken, onNavigate, source, billingMode }: Over
             {formatPercent(sr.completePercent)}
           </span>
         </span>
+        {overview.tracesWithFaults > 0 ? (
+          <>
+            <span className="stat-strip__separator">|</span>
+            <span className="stat-strip__item">
+              <span className="stat-strip__label">Faults:</span>{" "}
+              <span style={{ color: "var(--accent-red)" }}>
+                {overview.faultCount} in {overview.tracesWithFaults} trace
+                {overview.tracesWithFaults === 1 ? "" : "s"}
+              </span>
+            </span>
+          </>
+        ) : null}
         <span className="stat-strip__separator">|</span>
         <span className="stat-strip__item">
           <span className="stat-strip__label">Avg turns:</span> {turns.avg}

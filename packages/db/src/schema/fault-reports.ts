@@ -13,6 +13,11 @@ const faultTypeValues = [
   "unknown",
 ] as const;
 
+const faultSeverityValues = ["low", "medium", "high", "critical"] as const;
+// Automated multi-agent fault attribution caps around ~33% accuracy, so every report carries an
+// honest confidence (high = first-class signal like status/errorMessage; low = structural proxy).
+const faultConfidenceValues = ["high", "medium", "low"] as const;
+
 export const faultReports = sqliteTable(
   "fault_reports",
   {
@@ -27,7 +32,10 @@ export const faultReports = sqliteTable(
       onDelete: "set null",
     }),
     faultType: text("fault_type", { enum: faultTypeValues }).notNull(),
+    severity: text("severity", { enum: faultSeverityValues }).notNull().default("medium"),
+    confidence: text("confidence", { enum: faultConfidenceValues }).notNull().default("medium"),
     description: text("description").notNull(),
+    recommendation: text("recommendation").notNull().default(""),
     cascadeDepth: integer("cascade_depth").notNull(),
     affectedSpanIds: text("affected_span_ids", { mode: "json" }).$type<string[]>().notNull(),
     detectedAt: integer("detected_at", { mode: "timestamp_ms" }).notNull(),

@@ -1,3 +1,4 @@
+import type { AdapterProduct } from "@langcost/core";
 import { createTraceRepository } from "@langcost/db";
 import { Hono } from "hono";
 
@@ -8,19 +9,27 @@ import { withDb } from "../lib/db";
 interface KnownAdapter {
   name: string;
   label: string;
+  // Which product this adapter feeds. Carried statically here so uninstalled adapters can still be
+  // grouped/flagged; for installed adapters the adapter's own `meta.product` is preferred (and must
+  // agree — see adapters route test).
+  product: AdapterProduct;
 }
 
+// SYNC INVARIANT: when adding a new adapter with product "ai", also add its source name to
+// AI_SOURCES in apps/web/src/lib/modes.ts so the web mode switch classifies its traces correctly.
 const KNOWN_ADAPTERS: KnownAdapter[] = [
-  { name: "openclaw", label: "OpenClaw" },
-  { name: "claude-code", label: "Claude Code" },
-  { name: "warp", label: "Warp" },
-  { name: "cline", label: "Cline" },
-  { name: "codex", label: "Codex" },
+  { name: "openclaw", label: "OpenClaw", product: "coding" },
+  { name: "claude-code", label: "Claude Code", product: "coding" },
+  { name: "warp", label: "Warp", product: "coding" },
+  { name: "cline", label: "Cline", product: "coding" },
+  { name: "codex", label: "Codex", product: "coding" },
+  { name: "langfuse", label: "Langfuse", product: "ai" },
 ];
 
 interface AdapterStatusBase {
   name: string;
   label: string;
+  product: AdapterProduct;
   traceCount: number;
   lastScanAt: string | null;
 }
@@ -51,6 +60,8 @@ async function buildAdapterStatus(
   const base: AdapterStatusBase = {
     name: known.name,
     label: known.label,
+    // Prefer the installed adapter's self-declared product; fall back to the static catalog.
+    product: loaded?.adapter.meta.product ?? known.product,
     traceCount: stats?.count ?? 0,
     lastScanAt: stats?.lastScanAt.toISOString() ?? null,
   };

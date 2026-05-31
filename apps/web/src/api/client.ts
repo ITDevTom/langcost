@@ -58,6 +58,9 @@ export interface OverviewResponse {
     count: number;
     totalWasted: number;
   }>;
+  faultCount: number;
+  tracesWithFaults: number;
+  topFaultTypes: Array<{ type: string; count: number }>;
   costByDay: Array<{
     date: string;
     costUsd: number;
@@ -218,6 +221,7 @@ export interface TraceSummary {
   ingestedAt: string;
   wasteUsd: number;
   wasteCount: number;
+  faultCount: number;
 }
 
 export interface TraceListResponse {
@@ -278,6 +282,29 @@ export interface WasteReportRecord {
   detectedAt: string;
 }
 
+export type FaultType =
+  | "upstream_data"
+  | "model_error"
+  | "tool_failure"
+  | "loop"
+  | "timeout"
+  | "unknown";
+
+export interface FaultReport {
+  id: string;
+  traceId: string;
+  faultSpanId: string;
+  rootCauseSpanId?: string | null;
+  faultType: FaultType;
+  severity: Severity;
+  confidence: "high" | "medium" | "low";
+  description: string;
+  recommendation: string;
+  cascadeDepth: number;
+  affectedSpanIds: string[];
+  detectedAt: string;
+}
+
 export interface MessageRecord {
   id: string;
   spanId: string;
@@ -308,6 +335,7 @@ export interface TraceDetailResponse {
     wastedCostUsd: number;
   };
   wasteReports: WasteReportRecord[];
+  faultReports: FaultReport[];
   topSpans: SpanRecord[];
   messages: MessageRecord[];
 }
@@ -486,6 +514,9 @@ export type AdapterInstallType = "npm" | "workspace";
 interface AdapterStatusBase {
   name: string;
   label: string;
+  // Mirrors AdapterProduct in @langcost/core and ProductMode in lib/modes (not imported here: this
+  // client stays dependency-free and defines its own response unions, like Severity/TraceStatus).
+  product: "coding" | "ai";
   traceCount: number;
   lastScanAt: string | null;
 }
@@ -527,6 +558,7 @@ export type RuleDataRequirement = "messages" | "cacheTokens" | "toolDefs" | "spa
 
 export interface RuleCatalogEntry {
   id: string;
+  kind: "cost" | "fault";
   tier: 1 | 2;
   title: string;
   description: string;

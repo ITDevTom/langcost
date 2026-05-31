@@ -1,4 +1,5 @@
 import {
+  createFaultReportRepository,
   createMessageRepository,
   createSegmentRepository,
   createSpanRepository,
@@ -27,6 +28,10 @@ export function createTracesRoute(options: { dbPath?: string } = {}) {
       const spanRepository = createSpanRepository(db);
       const wasteRepository = createWasteReportRepository(db);
       const wasteReports = wasteRepository.list();
+      const faultCountByTraceId = new Map<string, number>();
+      for (const fault of createFaultReportRepository(db).list()) {
+        faultCountByTraceId.set(fault.traceId, (faultCountByTraceId.get(fault.traceId) ?? 0) + 1);
+      }
 
       let traces = traceRepository.listForAnalysis({
         ...(since ? { since: new Date(since) } : {}),
@@ -49,6 +54,7 @@ export function createTracesRoute(options: { dbPath?: string } = {}) {
           trace,
           wasteReports.filter((report) => report.traceId === trace.id),
           spanRepository.listByTraceId(trace.id).length,
+          faultCountByTraceId.get(trace.id) ?? 0,
         ),
       );
 
@@ -80,10 +86,11 @@ export function createTracesRoute(options: { dbPath?: string } = {}) {
       const spans = spanRepository.listByTraceId(traceId);
       const segments = segmentRepository.listByTraceId(traceId);
       const wasteReports = wasteRepository.listByTraceId(traceId);
+      const faultReports = createFaultReportRepository(db).listByTraceId(traceId);
       const messages = messageRepository.listByTraceId(traceId);
 
       return {
-        ...normalizeTraceDetail(trace, spans, segments, wasteReports),
+        ...normalizeTraceDetail(trace, spans, segments, wasteReports, faultReports),
         messages,
       };
     });

@@ -1,8 +1,18 @@
+/**
+ * Which langcost product an adapter feeds the dashboard:
+ *   - "coding" → local coding-agent session logs (OpenClaw, Claude Code, Warp, Cline, Codex)
+ *   - "ai"     → production AI-agent traces (Langfuse, …) with the lens view + fault tolerance
+ * Distinct from `sourceType` on purpose: a production source could be local, or a coding source
+ * could be an API. Every adapter must declare its product so new AI-agent adapters are flagged.
+ */
+export type AdapterProduct = "coding" | "ai";
+
 export interface AdapterMeta {
   name: string;
   version: string;
   description: string;
   sourceType: "local" | "api";
+  product: AdapterProduct;
 }
 
 export interface IngestOptions {

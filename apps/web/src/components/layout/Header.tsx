@@ -1,4 +1,5 @@
 import type { SourceInfo } from "../../api/client";
+import { MODES, type ProductMode } from "../../lib/modes";
 
 interface HeaderProps {
   currentPath: string;
@@ -7,6 +8,8 @@ interface HeaderProps {
   refreshing: boolean;
   theme: "dark" | "light";
   onToggleTheme: () => void;
+  mode: ProductMode;
+  onModeChange: (mode: ProductMode) => void;
   sources: SourceInfo[];
   activeSource?: string | undefined;
   onSourceChange: (source: string | undefined) => void;
@@ -17,7 +20,11 @@ interface HeaderProps {
 const SOURCE_LABELS: Record<string, string> = {
   "claude-code": "Claude Code",
   openclaw: "OpenClaw",
+  warp: "Warp",
+  cline: "Cline",
+  codex: "Codex",
   langfuse: "Langfuse",
+  sample: "Sample data",
 };
 
 const NAV_ITEMS = [
@@ -33,6 +40,8 @@ export function Header({
   refreshing,
   theme,
   onToggleTheme,
+  mode,
+  onModeChange,
   sources,
   activeSource,
   onSourceChange,
@@ -60,6 +69,22 @@ export function Header({
               Lang<span style={{ color: "var(--accent-orange, #ff6b00)" }}>Cost</span>
             </span>
           </button>
+
+          <div className="mode-switch" role="tablist" aria-label="Product">
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                role="tab"
+                aria-selected={mode === m.id}
+                title={m.tagline}
+                onClick={() => onModeChange(m.id)}
+                className={`mode-switch__option ${mode === m.id ? "mode-switch__option--active" : ""}`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
 
           <nav className="hidden items-center gap-1 md:flex">
             {NAV_ITEMS.map((item) => {
@@ -101,7 +126,7 @@ export function Header({
             </span>
           ) : null}
 
-          {hasData ? (
+          {hasData && mode === "coding" ? (
             <div className="theme-toggle">
               <button
                 type="button"

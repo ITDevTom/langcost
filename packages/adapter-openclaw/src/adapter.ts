@@ -49,6 +49,7 @@ export const openClawAdapter: IAdapter<Db> = {
     version: "0.0.1",
     description: "Ingest OpenClaw JSONL sessions from local disk into langcost SQLite.",
     sourceType: "local",
+    product: "coding",
   },
 
   async validate(options?: IngestOptions) {

@@ -57,6 +57,7 @@ export const claudeCodeAdapter: IAdapter<Db> = {
     version: "0.1.0",
     description: "Ingest Claude Code conversation logs from local disk into langcost SQLite.",
     sourceType: "local",
+    product: "coding",
   },
 
   async validate(options?: ClaudeCodeIngestOptions) {

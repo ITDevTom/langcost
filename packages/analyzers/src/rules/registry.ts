@@ -2,6 +2,7 @@ import type { RuleCatalogEntry, RulesConfig } from "@langcost/core";
 
 import { agentLoopsRule } from "./agent-loops";
 import { cacheExpiryRule } from "./cache-expiry";
+import { getFaultRuleCatalog } from "./fault/registry";
 import { highOutputRule } from "./high-output";
 import { lowCacheRule } from "./low-cache";
 import { modelOveruseRule } from "./model-overuse";
@@ -26,10 +27,11 @@ const BUILTIN_RULES: readonly WasteRule[] = [
 
 const registry = new Map<string, WasteRule>(BUILTIN_RULES.map((rule) => [rule.id, rule]));
 
-/** Serializable metadata for every registered rule — surfaced to the CLI / API / dashboard. */
+/** Serializable metadata for every registered cost rule — surfaced to the CLI / API / dashboard. */
 export function getRuleCatalog(): RuleCatalogEntry[] {
   return [...registry.values()].map((rule) => ({
     id: rule.id,
+    kind: "cost" as const,
     tier: rule.tier,
     title: rule.title,
     description: rule.description,
@@ -37,6 +39,11 @@ export function getRuleCatalog(): RuleCatalogEntry[] {
     requires: rule.requires ?? [],
     defaultThresholds: rule.defaultThresholds ?? {},
   }));
+}
+
+/** Combined catalog of cost + fault rules — what the CLI / API / dashboard list and configure. */
+export function getAllRuleCatalog(): RuleCatalogEntry[] {
+  return [...getRuleCatalog(), ...getFaultRuleCatalog()];
 }
 
 /** A rule selected to run, with its resolved thresholds and adapter scope. */
@@ -82,7 +89,7 @@ export function resolveRules(config: RulesConfig | null | undefined): ResolvedRu
 export function allRulesEnabledConfig(): RulesConfig {
   return {
     rules: Object.fromEntries(
-      getRuleCatalog().map((entry) => [entry.id, { enabled: true, sources: "*" as const }]),
+      getAllRuleCatalog().map((entry) => [entry.id, { enabled: true, sources: "*" as const }]),
     ),
   };
 }

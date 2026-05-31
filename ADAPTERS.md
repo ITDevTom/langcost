@@ -74,3 +74,4 @@ Each adapter auto-discovers its source location. If yours isn't in the default s
 | **Warp** | `--source warp` | `@langcost/adapter-warp` | `--warp-plan <plan>` — credit-rate assumption for arbitrage reporting. One of `build`, `business`, `add-on-low`, `add-on-high`, `byok`. Default `build`. |
 | **Cline** | `--source cline` | `@langcost/adapter-cline` | — |
 | **Codex** | `--source codex` | `@langcost/adapter-codex` | — |
+| **Langfuse** | `--source langfuse` | `@langcost/adapter-langfuse` | `--api-key <publicKey:secretKey>` (required) and `--api-url` (default `https://cloud.langfuse.com`) — ingests production agent traces from the Langfuse API. |

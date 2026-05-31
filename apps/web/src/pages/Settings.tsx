@@ -15,8 +15,10 @@ import {
   uninstallAdapter,
 } from "../api/client";
 import { formatInt, formatRelativeTime } from "../lib/format";
+import { MODES, type ProductMode } from "../lib/modes";
 
 interface SettingsProps {
+  mode: ProductMode;
   onShellRefresh: () => Promise<void> | void;
 }
 
@@ -32,6 +34,15 @@ const INITIAL_ROW_STATE: RowState = { action: "idle", message: null, error: null
 
 const REPO_URL = "https://github.com/vjvkrm/langcost";
 const ADAPTERS_DIR_URL = `${REPO_URL}/tree/main/packages`;
+
+/**
+ * Bucket an adapter into a product group. Anything not explicitly flagged "ai" (including a missing
+ * product field from an older/stale API response) falls back to "coding", so adapters are never
+ * dropped from the list — mirrors modeForSource's unknown→coding default.
+ */
+function productGroupOf(adapter: AdapterStatus): ProductMode {
+  return adapter.product === "ai" ? "ai" : "coding";
+}
 
 /** Whether a rule (with its persisted scope) currently applies to a given adapter. */
 function ruleAppliesToAdapter(entry: RuleConfigEntry | undefined, adapterName: string): boolean {
@@ -78,7 +89,7 @@ function toggleRuleForAdapter(
   return { rules: { ...config.rules, [ruleId]: next } };
 }
 
-export function Settings({ onShellRefresh }: SettingsProps) {
+export function Settings({ mode, onShellRefresh }: SettingsProps) {
   const [adapters, setAdapters] = useState<AdapterStatus[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [rowState, setRowState] = useState<Record<string, RowState>>({});
@@ -178,7 +189,13 @@ export function Settings({ onShellRefresh }: SettingsProps) {
     );
   }
 
+  // Rule-scope expansion ("*") must span ALL adapters regardless of the visible product, so this
+  // list is intentionally unfiltered.
   const adapterNames = (adapters ?? []).map((adapter) => adapter.name);
+
+  // The Adapters page shows only the adapters for the product you're currently in.
+  const activeMode = MODES.find((m) => m.id === mode);
+  const visibleAdapters = adapters?.filter((adapter) => productGroupOf(adapter) === mode);
 
   function handleToggleRule(adapterName: string, ruleId: string) {
     setRulesConfig((current) => toggleRuleForAdapter(current, ruleId, adapterName, adapterNames));
@@ -198,7 +215,7 @@ export function Settings({ onShellRefresh }: SettingsProps) {
     try {
       const result = await saveRules(rulesConfig);
       setRulesMessage(
-        `Saved. Re-analyzed ${result.tracesAnalyzed} trace(s); ${result.findingsCount} waste finding(s).`,
+        `Saved. Re-analyzed ${result.tracesAnalyzed} trace(s); ${result.findingsCount} finding(s).`,
       );
       await loadAll();
       await onShellRefresh();
@@ -216,8 +233,8 @@ export function Settings({ onShellRefresh }: SettingsProps) {
           <div>
             <h1 className="text-2xl font-semibold text-slate-50">Adapters</h1>
             <p className="section-copy mt-2 text-sm">
-              Install or uninstall adapters, sync their traces, and choose which waste-detection
-              rules run for each.{" "}
+              Install or uninstall adapters, sync their traces, and choose which detection rules
+              (cost + fault) run for each.{" "}
               <a
                 href={ADAPTERS_DIR_URL}
                 target="_blank"
@@ -241,31 +258,47 @@ export function Settings({ onShellRefresh }: SettingsProps) {
           <div className="banner banner--info mt-6 text-sm">{rulesMessage}</div>
         ) : null}
 
-        <div className="mt-6 space-y-3">
-          {adapters === null ? (
-            <p className="text-sm text-slate-500">Loading adapters…</p>
-          ) : (
-            adapters.map((adapter) => (
-              <AdapterRow
-                key={adapter.name}
-                adapter={adapter}
-                state={rowState[adapter.name] ?? INITIAL_ROW_STATE}
-                onSync={handleSync}
-                onInstall={handleInstall}
-                onUninstall={handleUninstall}
-                rulesCatalog={rulesCatalog}
-                isExpanded={expanded[adapter.name] ?? false}
-                onToggleExpand={() => toggleExpand(adapter.name)}
-                isRuleChecked={(ruleId) =>
-                  ruleAppliesToAdapter(rulesConfig.rules[ruleId], adapter.name)
-                }
-                onToggleRule={(ruleId) => handleToggleRule(adapter.name, ruleId)}
-                onSaveRules={() => void handleSaveRules()}
-                savingRules={savingRules}
-                rulesDirty={rulesDirty}
-              />
-            ))
-          )}
+        <div className="mt-6">
+          <div className="flex items-baseline gap-2">
+            <h2
+              className="text-xs font-semibold uppercase tracking-wide"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              {activeMode?.label ?? "Available"} adapters
+            </h2>
+            {activeMode?.tagline ? (
+              <span className="text-xs text-slate-500">{activeMode.tagline}</span>
+            ) : null}
+          </div>
+
+          <div className="mt-3 space-y-3">
+            {visibleAdapters === undefined ? (
+              <p className="text-sm text-slate-500">Loading adapters…</p>
+            ) : visibleAdapters.length === 0 ? (
+              <p className="text-sm text-slate-500">No adapters available for this product yet.</p>
+            ) : (
+              visibleAdapters.map((adapter) => (
+                <AdapterRow
+                  key={adapter.name}
+                  adapter={adapter}
+                  state={rowState[adapter.name] ?? INITIAL_ROW_STATE}
+                  onSync={handleSync}
+                  onInstall={handleInstall}
+                  onUninstall={handleUninstall}
+                  rulesCatalog={rulesCatalog}
+                  isExpanded={expanded[adapter.name] ?? false}
+                  onToggleExpand={() => toggleExpand(adapter.name)}
+                  isRuleChecked={(ruleId) =>
+                    ruleAppliesToAdapter(rulesConfig.rules[ruleId], adapter.name)
+                  }
+                  onToggleRule={(ruleId) => handleToggleRule(adapter.name, ruleId)}
+                  onSaveRules={() => void handleSaveRules()}
+                  savingRules={savingRules}
+                  rulesDirty={rulesDirty}
+                />
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -425,7 +458,7 @@ function AdapterRow({
           >
             <span aria-hidden>{isExpanded ? "▾" : "▸"}</span>
             <span>
-              Waste rules{" "}
+              Detection rules{" "}
               <span className="text-slate-500">
                 ({enabledRuleCount}/{rulesCatalog.length} on)
               </span>
@@ -451,7 +484,14 @@ function AdapterRow({
                     />
                     <span className="min-w-0">
                       <span className="font-medium">{rule.title}</span>
-                      <span className="ml-1 text-[10px] text-slate-500">T{rule.tier}</span>
+                      <span
+                        className="ml-1 text-[10px] uppercase tracking-wide"
+                        style={{
+                          color: rule.kind === "fault" ? "var(--accent-red)" : "var(--text-muted)",
+                        }}
+                      >
+                        {rule.kind ?? "cost"}
+                      </span>
                       <span className="block text-[11px] leading-snug text-slate-500">
                         {rule.description}
                       </span>

@@ -1,4 +1,5 @@
 import {
+  createFaultReportRepository,
   createSpanRepository,
   createTraceRepository,
   createWasteReportRepository,
@@ -17,12 +18,14 @@ export function createOverviewRoute(options: { dbPath?: string } = {}) {
     const payload = await withDb(options.dbPath, (db) => {
       let traces = createTraceRepository(db).listForAnalysis();
       let wasteReports = createWasteReportRepository(db).list();
+      let faultReports = createFaultReportRepository(db).list();
       const spanRepository = createSpanRepository(db);
 
       if (source) {
         const traceIds = new Set(traces.filter((t) => t.source === source).map((t) => t.id));
         traces = traces.filter((t) => t.source === source);
         wasteReports = wasteReports.filter((r) => traceIds.has(r.traceId));
+        faultReports = faultReports.filter((r) => traceIds.has(r.traceId));
       }
 
       // Build turn counts per trace (LLM spans = turns)
@@ -32,7 +35,7 @@ export function createOverviewRoute(options: { dbPath?: string } = {}) {
         turnsByTraceId.set(trace.id, spans.filter((s) => s.type === "llm").length);
       }
 
-      return buildOverviewPayload(traces, wasteReports, turnsByTraceId);
+      return buildOverviewPayload(traces, wasteReports, turnsByTraceId, faultReports);
     });
 
     return c.json(payload);
