@@ -2,8 +2,8 @@ import type { RuleCatalogEntry, RulesConfig } from "@langcost/core";
 
 import { agentLoopsRule } from "./agent-loops";
 import { cacheExpiryRule } from "./cache-expiry";
-import { getFaultRuleCatalog } from "./fault/registry";
 import { duplicateRagRule } from "./duplicate-rag";
+import { getFaultRuleCatalog } from "./fault/registry";
 import { highOutputRule } from "./high-output";
 import { lowCacheRule } from "./low-cache";
 import { modelOveruseRule } from "./model-overuse";
