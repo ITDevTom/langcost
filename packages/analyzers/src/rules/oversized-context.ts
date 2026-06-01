@@ -28,7 +28,7 @@ function median(values: number[]): number {
 
 export const oversizedContextRule: WasteRule = {
   id: "oversized-context",
-  tier: 2,
+  tier: 1,
   title: "Oversized context",
   description: "LLM turns with unusually large input context compared to trace baseline.",
   defaultEnabled: false,
