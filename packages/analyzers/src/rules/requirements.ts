@@ -41,9 +41,7 @@ function satisfiesOne(context: TraceAnalysisContext, requirement: DataRequiremen
       return context.spans.length > 0;
     case "cacheTokens":
       return context.llmSpans.some((span) =>
-        CACHE_TOKEN_KEYS.some(
-          (key) => getNumericMetadataValue(span.metadata, key) !== undefined,
-        ),
+        CACHE_TOKEN_KEYS.some((key) => getNumericMetadataValue(span.metadata, key) !== undefined),
       );
     case "toolDefs":
       // The normalized model does not yet capture declared tool sets; never block on it.

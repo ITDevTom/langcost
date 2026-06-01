@@ -150,11 +150,11 @@ describe("unboundedHistoryRule", () => {
     ];
     const segments = [
       makeHistorySegment("seg-1", "llm-1", 5_000, 0.08),
-      makeHistorySegment("seg-2", "llm-2", 6_000, 0.10),
+      makeHistorySegment("seg-2", "llm-2", 6_000, 0.1),
       makeHistorySegment("seg-3", "llm-3", 3_000, 0.05),
       makeHistorySegment("seg-4", "llm-4", 4_500, 0.07),
       makeHistorySegment("seg-5", "llm-5", 8_000, 0.12),
-      makeHistorySegment("seg-6", "llm-6", 12_000, 0.20),
+      makeHistorySegment("seg-6", "llm-6", 12_000, 0.2),
     ];
     const context = buildTraceContext(makeTrace(), spans, [], segments);
 

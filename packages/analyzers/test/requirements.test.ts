@@ -43,19 +43,17 @@ describe("satisfiesRequirements", () => {
 
   it("satisfies cacheTokens when span carries cachedInputTokens (codex adapter key)", () => {
     expect(
-      satisfiesRequirements(
-        ctx({ llmSpans: [{ metadata: { cachedInputTokens: 500 } }] }),
-        ["cacheTokens"],
-      ),
+      satisfiesRequirements(ctx({ llmSpans: [{ metadata: { cachedInputTokens: 500 } }] }), [
+        "cacheTokens",
+      ]),
     ).toBe(true);
   });
 
   it("satisfies cacheTokens when span carries cacheReadTokens", () => {
     expect(
-      satisfiesRequirements(
-        ctx({ llmSpans: [{ metadata: { cacheReadTokens: 200 } }] }),
-        ["cacheTokens"],
-      ),
+      satisfiesRequirements(ctx({ llmSpans: [{ metadata: { cacheReadTokens: 200 } }] }), [
+        "cacheTokens",
+      ]),
     ).toBe(true);
   });
 
