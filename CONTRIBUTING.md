@@ -62,7 +62,10 @@ These keep the plugin model intact — PRs that break them will be asked to rewo
 1. Create `packages/analyzers/src/rules/my-rule.ts` exporting a `WasteRule` (`id`, `title`, `description`, `defaultEnabled`, optional `requires`/`defaultThresholds`, and `detect(contexts, config?)` returning `WasteReportRecord[]`). Copy an existing rule.
 2. Register it in `packages/analyzers/src/rules/registry.ts` (`BUILTIN_RULES`) and export it from `rules/index.ts`.
 3. Add a test in `packages/analyzers/test/`.
-4. Set `requires` to the normalized data it needs; the runner auto-skips traces lacking it. Detection is **opt-in** — `defaultEnabled` is only a UI pre-check hint.
+4. Set `requires` to the normalized data it needs (`"messages"`, `"cacheTokens"`, `"spans"`, …); the runner auto-skips — and explains — traces lacking it. Detection is **opt-in** — `defaultEnabled` is only a UI pre-check hint.
+5. Set the metadata honestly:
+   - **`tier`** — `2` if the rule needs message bodies, segment detail, or cache metadata (data beyond raw span token counts); `1` if it works off span token counts alone.
+   - **`defaultEnabled`** — `false` for noisy or experimental heuristics; `true` only for high-precision rules. (Opt-in means this never auto-runs a rule — it only pre-checks it during onboarding.)
 
 ### 🧭 Add a fault-attribution rule
 
@@ -99,6 +102,7 @@ Commit the generated SQL + snapshot. Migrations apply automatically via `migrate
 - **Rebase on `main` first** and resolve conflicts before requesting review.
 - Keep the four checks green (lint · test · typecheck · build).
 - One logical change per PR where practical; conventional-commit titles (`feat:`, `fix:`, `chore:`).
-- **Don't commit AI-tooling config.** `CLAUDE.md`, `AGENTS.md`, `.cursor/`, `.claude/`, `.codex/`, `.ai-context.yaml`, and internal design docs are gitignored on purpose — keep them local.
+- **`AGENTS.md` is the committed agent contract** — the tooling-agnostic dos/don'ts every agent (and contributor) should follow, enforced by `packages/architecture.test.ts`. Keep it in sync with this file.
+- **Don't commit your own AI-tooling config.** `CLAUDE.md`, `.cursor/`, `.claude/`, `.codex/`, `.ai-context.yaml`, and internal design docs are gitignored on purpose — keep them local.
 
 By contributing you agree your contributions are licensed under the repository's **AGPL-3.0** license.
