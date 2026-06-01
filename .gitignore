@@ -14,10 +14,10 @@ packages/cli/dashboard
 bun.lockb
 
 # Agent/AI tool config — keep out of repo
+# NOTE: AGENTS.md is intentionally NOT ignored — it's the committed, tooling-agnostic agent contract.
 CLAUDE.md
 packages/*/CLAUDE.md
 apps/*/CLAUDE.md
-AGENTS.md
 .cursor/
 .claude/
 .codex/
