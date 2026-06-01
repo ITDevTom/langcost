@@ -28,10 +28,10 @@ function median(values: number[]): number {
 
 export const oversizedContextRule: WasteRule = {
   id: "oversized-context",
-  tier: 1,
+  tier: 2,
   title: "Oversized context",
   description: "LLM turns with unusually large input context compared to trace baseline.",
-  defaultEnabled: true,
+  defaultEnabled: false,
   requires: ["spans"],
   defaultThresholds: {
     minInputTokens: 50_000,
@@ -45,11 +45,6 @@ export const oversizedContextRule: WasteRule = {
 
       const minInputTokens = Math.max(0, config?.thresholds.minInputTokens ?? 50_000);
       const medianMultiplier = Math.max(1, config?.thresholds.medianMultiplier ?? 3);
-      const traceMedianInput = median(
-        context.llmSpans
-          .map((span) => span.inputTokens ?? 0)
-          .filter((inputTokens) => inputTokens > 0),
-      );
 
       const reports: WasteReportRecord[] = [];
       for (const span of context.llmSpans) {
@@ -58,9 +53,14 @@ export const oversizedContextRule: WasteRule = {
           continue;
         }
 
-        const relativeThreshold = traceMedianInput * medianMultiplier;
+        const others = context.llmSpans
+          .filter((s) => s.id !== span.id)
+          .map((s) => s.inputTokens ?? 0)
+          .filter((t) => t > 0);
+        const baselineMedian = median(others);
+        const relativeThreshold = baselineMedian * medianMultiplier;
         const triggeredByAbsolute = inputTokens >= minInputTokens;
-        const triggeredByRelative = traceMedianInput > 0 && inputTokens >= relativeThreshold;
+        const triggeredByRelative = baselineMedian > 0 && inputTokens >= relativeThreshold;
         if (!triggeredByAbsolute && !triggeredByRelative) {
           continue;
         }
@@ -72,6 +72,9 @@ export const oversizedContextRule: WasteRule = {
               ? minInputTokens
               : relativeThreshold;
         const excessTokens = Math.max(0, inputTokens - baseline);
+        if (excessTokens <= 0) {
+          continue;
+        }
         const wastedCostUsd = span.costUsd ? span.costUsd * (excessTokens / inputTokens) : 0;
 
         const segmentTotalsByType = new Map<SegmentType, number>();
@@ -103,7 +106,7 @@ export const oversizedContextRule: WasteRule = {
               "Summarize old history, trim stale tool results, reduce RAG payload size, or split work into smaller turns.",
             evidence: {
               inputTokens,
-              traceMedianInputTokens: traceMedianInput,
+              traceMedianInputTokens: baselineMedian,
               thresholds: {
                 minInputTokens,
                 medianMultiplier,

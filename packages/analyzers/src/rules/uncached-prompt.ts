@@ -12,16 +12,17 @@ function getCacheReadTokens(
   return (
     getNumericMetadataValue(metadata, "cacheRead") ??
     getNumericMetadataValue(metadata, "cacheReadTokens") ??
-    getNumericMetadataValue(metadata, "cacheReads")
+    getNumericMetadataValue(metadata, "cacheReads") ??
+    getNumericMetadataValue(metadata, "cachedInputTokens")
   );
 }
 
 export const uncachedPromptRule: WasteRule = {
   id: "uncached-prompt",
-  tier: 1,
+  tier: 2,
   title: "Uncached prompt",
   description: "Repeated stable prompt segments were sent with little or no cache-read benefit.",
-  defaultEnabled: true,
+  defaultEnabled: false,
   requires: ["spans", "cacheTokens"],
   defaultThresholds: {
     minRepeatedTokens: 8_000,

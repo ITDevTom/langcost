@@ -167,6 +167,60 @@ describe("unusedToolsRule", () => {
     expect(reports).toHaveLength(0);
   });
 
+  it("does not flag when tool output has high overlap with next LLM message", () => {
+    const sharedContent = "function parseConfig read file parse JSON schema validate return config object";
+    const spans = [
+      makeToolSpan("tool-1", 1, "Read", sharedContent),
+      makeLlmSpan("llm-1", 2),
+    ];
+    const segments = [makeToolResultSegment("seg-1", "tool-1", 3_000, 0.03)];
+    const messages = [
+      makeMessage(
+        "msg-1",
+        "llm-1",
+        "assistant",
+        `I see the config. ${sharedContent} — I'll update the parseConfig function accordingly.`,
+      ),
+    ];
+
+    const context = buildTraceContext(makeTrace(), spans, messages, segments);
+    const reports = unusedToolsRule.detect([context]);
+    expect(reports).toHaveLength(0);
+  });
+
+  it("does not flag when tool output has high overlap with next tool input", () => {
+    const sharedContent = "function parseConfig read file parse JSON schema validate return config object";
+    const spans = [
+      makeToolSpan("tool-1", 1, "Read", sharedContent),
+      makeLlmSpan("llm-1", 2),
+      makeToolSpan("tool-2", 3, "Bash", "ok", `apply changes to ${sharedContent}`),
+    ];
+    const segments = [
+      makeToolResultSegment("seg-1", "tool-1", 3_000, 0.03),
+      makeToolResultSegment("seg-2", "tool-2", 100, 0.001),
+    ];
+    const messages = [
+      makeMessage("msg-1", "llm-1", "assistant", "Applying changes now."),
+    ];
+
+    const context = buildTraceContext(makeTrace(), spans, messages, segments);
+    const reports = unusedToolsRule.detect([context]);
+    expect(reports).toHaveLength(0);
+  });
+
+  it("does not flag when no downstream comparison text is available", () => {
+    const toolOutput = "server metrics heap allocations stack traces megabytes process snapshots";
+    const spans = [
+      makeToolSpan("tool-1", 1, "Bash", toolOutput),
+      makeLlmSpan("llm-1", 2),
+    ];
+    const segments = [makeToolResultSegment("seg-1", "tool-1", 3_000, 0.03)];
+    // No messages for llm-1 and no subsequent tool input
+    const context = buildTraceContext(makeTrace(), spans, [], segments);
+    const reports = unusedToolsRule.detect([context]);
+    expect(reports).toHaveLength(0);
+  });
+
   it("does not flag productive tools when adapter emits alias-style names", () => {
     const spans = [
       makeToolSpan("tool-1", 1, "write_to_file", "a lot of changed code output"),

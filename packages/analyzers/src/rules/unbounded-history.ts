@@ -32,7 +32,6 @@ function hasStrongGrowth(
     return { detected: false, spanIds: [] };
   }
 
-  let bestWindow: SpanHistoryEntry[] = [];
   let currentWindow: SpanHistoryEntry[] = [];
 
   for (const entry of entries) {
@@ -40,38 +39,42 @@ function hasStrongGrowth(
     if (!previous || entry.historyTokens > previous.historyTokens) {
       currentWindow.push(entry);
     } else {
+      // End of a maximal increasing run — evaluate it
+      if (currentWindow.length >= minConsecutiveSpans) {
+        const first = currentWindow[0];
+        const last = currentWindow[currentWindow.length - 1];
+        if (first && last && first.historyTokens > 0) {
+          const ratio = last.historyTokens / first.historyTokens;
+          if (ratio >= growthMultiplier) {
+            return { detected: true, spanIds: currentWindow.map((e) => e.spanId) };
+          }
+        }
+      }
       currentWindow = [entry];
     }
+  }
 
-    if (currentWindow.length > bestWindow.length) {
-      bestWindow = [...currentWindow];
+  // Evaluate the final window
+  if (currentWindow.length >= minConsecutiveSpans) {
+    const first = currentWindow[0];
+    const last = currentWindow[currentWindow.length - 1];
+    if (first && last && first.historyTokens > 0) {
+      const ratio = last.historyTokens / first.historyTokens;
+      if (ratio >= growthMultiplier) {
+        return { detected: true, spanIds: currentWindow.map((e) => e.spanId) };
+      }
     }
   }
 
-  if (bestWindow.length < minConsecutiveSpans) {
-    return { detected: false, spanIds: [] };
-  }
-
-  const first = bestWindow[0];
-  const last = bestWindow[bestWindow.length - 1];
-  if (!first || !last || first.historyTokens <= 0) {
-    return { detected: false, spanIds: [] };
-  }
-
-  const ratio = last.historyTokens / first.historyTokens;
-  if (ratio < growthMultiplier) {
-    return { detected: false, spanIds: [] };
-  }
-
-  return { detected: true, spanIds: bestWindow.map((entry) => entry.spanId) };
+  return { detected: false, spanIds: [] };
 }
 
 export const unboundedHistoryRule: WasteRule = {
   id: "unbounded-history",
-  tier: 1,
+  tier: 2,
   title: "Unbounded history",
   description: "Conversation history grows and dominates prompt input across turns.",
-  defaultEnabled: true,
+  defaultEnabled: false,
   requires: ["spans"],
   defaultThresholds: {
     minHistoryTokens: 4_000,

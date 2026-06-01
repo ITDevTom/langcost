@@ -118,6 +118,54 @@ describe("unboundedHistoryRule", () => {
     expect(reports).toHaveLength(0);
   });
 
+  it("reports growthDetected when history clearly clears the multiplier", () => {
+    const spans = [
+      makeLlmSpan("llm-1", 1, 8_000),
+      makeLlmSpan("llm-2", 2, 16_000),
+      makeLlmSpan("llm-3", 3, 32_000),
+    ];
+    const segments = [
+      makeHistorySegment("seg-1", "llm-1", 4_000, 0.06),
+      makeHistorySegment("seg-2", "llm-2", 8_000, 0.12),
+      makeHistorySegment("seg-3", "llm-3", 16_000, 0.24),
+    ];
+    const context = buildTraceContext(makeTrace(), spans, [], segments);
+
+    const reports = unboundedHistoryRule.detect([context]);
+
+    expect(reports).toHaveLength(1);
+    const evidence = reports[0]?.evidence as Record<string, unknown>;
+    expect(evidence.growthDetected).toBe(true);
+    expect(evidence.growthSpanIds).toEqual(["llm-1", "llm-2", "llm-3"]);
+  });
+
+  it("detects growth after a mid-series dip (window reset)", () => {
+    const spans = [
+      makeLlmSpan("llm-1", 1, 10_000),
+      makeLlmSpan("llm-2", 2, 12_000),
+      makeLlmSpan("llm-3", 3, 8_000),
+      makeLlmSpan("llm-4", 4, 10_000),
+      makeLlmSpan("llm-5", 5, 16_000),
+      makeLlmSpan("llm-6", 6, 24_000),
+    ];
+    const segments = [
+      makeHistorySegment("seg-1", "llm-1", 5_000, 0.08),
+      makeHistorySegment("seg-2", "llm-2", 6_000, 0.10),
+      makeHistorySegment("seg-3", "llm-3", 3_000, 0.05),
+      makeHistorySegment("seg-4", "llm-4", 4_500, 0.07),
+      makeHistorySegment("seg-5", "llm-5", 8_000, 0.12),
+      makeHistorySegment("seg-6", "llm-6", 12_000, 0.20),
+    ];
+    const context = buildTraceContext(makeTrace(), spans, [], segments);
+
+    const reports = unboundedHistoryRule.detect([context]);
+
+    expect(reports).toHaveLength(1);
+    const evidence = reports[0]?.evidence as Record<string, unknown>;
+    expect(evidence.growthDetected).toBe(true);
+    expect(evidence.growthSpanIds).toEqual(["llm-3", "llm-4", "llm-5", "llm-6"]);
+  });
+
   it("supports threshold overrides via resolved config", () => {
     const spans = [makeLlmSpan("llm-1", 1, 7_000)];
     const segments = [makeHistorySegment("seg-1", "llm-1", 2_500, 0.05)];

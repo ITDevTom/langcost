@@ -38,11 +38,11 @@ function getSpanMessagesContent(
 
 export const unusedToolsRule: WasteRule = {
   id: "unused-tools",
-  tier: 1,
+  tier: 2,
   title: "Unused tool output",
   description: "Large tool outputs that appear not to influence subsequent model or tool work.",
   defaultEnabled: false,
-  requires: ["spans"],
+  requires: ["spans", "messages"],
   defaultThresholds: {
     minToolResultTokens: 2_000,
     maxSimilarity: 0.08,
@@ -115,6 +115,10 @@ export const unusedToolsRule: WasteRule = {
           (candidate) => candidate.startedAt.getTime() > tool.startedAt.getTime(),
         );
         const nextToolInput = (nextTool?.toolInput ?? "").trim();
+
+        if (nextLlmText.length === 0 && nextToolInput.length === 0) {
+          continue; // no observable downstream usage — can't conclude "unused"
+        }
 
         const similarityWithNextLlm =
           nextLlmText.length > 0 ? jaccardSimilarity(outputText, nextLlmText) : 0;

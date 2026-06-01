@@ -5,10 +5,10 @@ import type { WasteRule } from "./types";
 
 export const duplicateRagRule: WasteRule = {
   id: "duplicate-rag",
-  tier: 1,
+  tier: 2,
   title: "Duplicate RAG context",
   description: "Repeated RAG context segments with identical content hashes.",
-  defaultEnabled: true,
+  defaultEnabled: false,
   requires: ["spans"],
   detect(contexts): WasteReportRecord[] {
     return contexts.flatMap((context) => {

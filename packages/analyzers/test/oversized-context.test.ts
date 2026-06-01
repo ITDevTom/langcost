@@ -90,7 +90,7 @@ describe("oversizedContextRule", () => {
     expect(reports[0]?.spanId).toBe("llm-2");
     expect(reports[0]?.wastedTokens).toBe(10_000);
     expect(reports[0]?.wastedCostUsd).toBeCloseTo(0.1333333333, 8);
-    expect((reports[0]?.evidence as Record<string, unknown>).traceMedianInputTokens).toBe(30_600);
+    expect((reports[0]?.evidence as Record<string, unknown>).traceMedianInputTokens).toBe(1_200);
     expect((reports[0]?.evidence as Record<string, unknown>).estimatedExcessTokens).toBe(10_000);
     expect((reports[0]?.evidence as Record<string, unknown>).dominantSegmentTypes).toEqual([
       { type: "conversation_history", tokenCount: 30_000 },
@@ -104,7 +104,7 @@ describe("oversizedContextRule", () => {
     });
     expect((reports[0]?.evidence as Record<string, unknown>).triggeredBy).toEqual({
       absolute: true,
-      relativeToMedian: false,
+      relativeToMedian: true,
     });
   });
 

@@ -3,6 +3,19 @@ import type { DataRequirement } from "@langcost/core";
 import { getNumericMetadataValue, type TraceAnalysisContext } from "../context";
 
 /**
+ * Superset of every metadata key that any waste rule reads as cache-token data.
+ * The cacheTokens gate and individual rules both reference this list so they can
+ * never drift out of sync.
+ */
+export const CACHE_TOKEN_KEYS = [
+  "cacheRead",
+  "cacheReadTokens",
+  "cacheReads",
+  "cachedInputTokens",
+  "cacheCreationTokens",
+] as const;
+
+/**
  * Whether a trace carries the normalized data a rule needs. The runner uses this to skip traces
  * that can't yield findings (e.g. an adapter that doesn't capture cache tokens), which is what
  * makes per-adapter behavior explainable in the dashboard rather than a silent zero.
@@ -27,10 +40,10 @@ function satisfiesOne(context: TraceAnalysisContext, requirement: DataRequiremen
     case "spans":
       return context.spans.length > 0;
     case "cacheTokens":
-      return context.llmSpans.some(
-        (span) =>
-          getNumericMetadataValue(span.metadata, "cacheRead") !== undefined ||
-          getNumericMetadataValue(span.metadata, "cacheCreationTokens") !== undefined,
+      return context.llmSpans.some((span) =>
+        CACHE_TOKEN_KEYS.some(
+          (key) => getNumericMetadataValue(span.metadata, key) !== undefined,
+        ),
       );
     case "toolDefs":
       // The normalized model does not yet capture declared tool sets; never block on it.
