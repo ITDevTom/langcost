@@ -28,6 +28,7 @@ const packages: ReleasePackage[] = [
   { dir: "packages/adapter-cline", access: "public" },
   { dir: "packages/adapter-warp", access: "public" },
   { dir: "packages/adapter-codex", access: "public" },
+  { dir: "packages/adapter-langfuse", access: "public" },
   { dir: "packages/cli", access: "public" },
 ];
 

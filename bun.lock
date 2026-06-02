@@ -15,7 +15,7 @@
     },
     "apps/api": {
       "name": "@langcost/api",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "dependencies": {
         "@langcost/analyzers": "workspace:*",
         "@langcost/core": "workspace:*",
@@ -25,7 +25,7 @@
     },
     "apps/web": {
       "name": "@langcost/web",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "dependencies": {
         "@radix-ui/react-collapsible": "^1.1.12",
         "@radix-ui/react-scroll-area": "^1.2.10",
@@ -47,7 +47,7 @@
     },
     "packages/adapter-claude-code": {
       "name": "@langcost/adapter-claude-code",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "dependencies": {
         "@langcost/core": "workspace:*",
         "@langcost/db": "workspace:*",
@@ -55,7 +55,7 @@
     },
     "packages/adapter-cline": {
       "name": "@langcost/adapter-cline",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "dependencies": {
         "@langcost/core": "workspace:*",
         "@langcost/db": "workspace:*",
@@ -63,7 +63,7 @@
     },
     "packages/adapter-codex": {
       "name": "@langcost/adapter-codex",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "dependencies": {
         "@langcost/core": "workspace:*",
         "@langcost/db": "workspace:*",
@@ -71,7 +71,7 @@
     },
     "packages/adapter-langfuse": {
       "name": "@langcost/adapter-langfuse",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "dependencies": {
         "@langcost/core": "workspace:*",
         "@langcost/db": "workspace:*",
@@ -79,7 +79,7 @@
     },
     "packages/adapter-openclaw": {
       "name": "@langcost/adapter-openclaw",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "dependencies": {
         "@langcost/core": "workspace:*",
         "@langcost/db": "workspace:*",
@@ -87,7 +87,7 @@
     },
     "packages/adapter-warp": {
       "name": "@langcost/adapter-warp",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "dependencies": {
         "@langcost/core": "workspace:*",
         "@langcost/db": "workspace:*",
@@ -95,7 +95,7 @@
     },
     "packages/analyzers": {
       "name": "@langcost/analyzers",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "dependencies": {
         "@langcost/core": "workspace:*",
         "@langcost/db": "workspace:*",
@@ -103,7 +103,7 @@
     },
     "packages/cli": {
       "name": "langcost",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "bin": {
         "langcost": "src/index.ts",
       },
@@ -116,11 +116,11 @@
     },
     "packages/core": {
       "name": "@langcost/core",
-      "version": "0.16.0",
+      "version": "0.17.0",
     },
     "packages/db": {
       "name": "@langcost/db",
-      "version": "0.16.0",
+      "version": "0.17.0",
       "dependencies": {
         "@langcost/core": "workspace:*",
         "drizzle-orm": "^0.45.1",
