@@ -79,6 +79,60 @@ describe("@langcost/api", () => {
     expect(health.traceLimit).toBe(500);
   });
 
+  it("persists Langfuse credentials + window, redacts the key, and preserves it on partial update", async () => {
+    const app = createApiApp({ dbPath: createTempDbPath() });
+
+    // Connect: save public:secret + host + 30-day window via the dashboard form.
+    const save = await app.request("/api/v1/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source: "langfuse",
+        apiKey: "pk-lf:sk-lf",
+        apiUrl: "https://us.cloud.langfuse.com",
+        windowDays: 30,
+      }),
+    });
+    expect(save.status).toBe(200);
+
+    const afterConnect = await readJson<{
+      source: string;
+      apiUrl: string;
+      windowDays: number;
+      hasApiKey: boolean;
+    }>(await app.request("/api/v1/settings"));
+    expect(afterConnect).toEqual({
+      source: "langfuse",
+      apiUrl: "https://us.cloud.langfuse.com",
+      windowDays: 30,
+      hasApiKey: true, // key stored but redacted (never returned in the clear)
+    });
+
+    // Partial update (window only, no key) for the SAME source must preserve the stored key.
+    await app.request("/api/v1/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "langfuse", windowDays: 60 }),
+    });
+    const afterUpdate = await readJson<{ windowDays: number; hasApiKey: boolean }>(
+      await app.request("/api/v1/settings"),
+    );
+    expect(afterUpdate.windowDays).toBe(60);
+    expect(afterUpdate.hasApiKey).toBe(true);
+
+    // Switching to a different source starts clean — credentials never carry across sources.
+    await app.request("/api/v1/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: "openclaw", sourcePath: "~/.openclaw" }),
+    });
+    const afterSwitch = await readJson<{ source: string; hasApiKey: boolean }>(
+      await app.request("/api/v1/settings"),
+    );
+    expect(afterSwitch.source).toBe("openclaw");
+    expect(afterSwitch.hasApiKey).toBe(false);
+  });
+
   it("lists known adapters with installed status, version, and install commands", async () => {
     const app = createApiApp({ dbPath: createTempDbPath() });
 

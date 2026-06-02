@@ -6,6 +6,8 @@ import { type AdapterInstallType, tryLoadAdapterWithSource } from "../lib/adapte
 import { installAdapterPackage, uninstallAdapterPackage } from "../lib/adapter-package";
 import { withDb } from "../lib/db";
 
+type AdapterSourceType = "local" | "api";
+
 interface KnownAdapter {
   name: string;
   label: string;
@@ -13,23 +15,27 @@ interface KnownAdapter {
   // grouped/flagged; for installed adapters the adapter's own `meta.product` is preferred (and must
   // agree — see adapters route test).
   product: AdapterProduct;
+  // Whether the source is a local path or a remote API. Surfaced to the web so the Settings form
+  // can show a credential form (api) vs a path field (local) even before the adapter is installed.
+  sourceType: AdapterSourceType;
 }
 
 // SYNC INVARIANT: when adding a new adapter with product "ai", also add its source name to
 // AI_SOURCES in apps/web/src/lib/modes.ts so the web mode switch classifies its traces correctly.
 const KNOWN_ADAPTERS: KnownAdapter[] = [
-  { name: "openclaw", label: "OpenClaw", product: "coding" },
-  { name: "claude-code", label: "Claude Code", product: "coding" },
-  { name: "warp", label: "Warp", product: "coding" },
-  { name: "cline", label: "Cline", product: "coding" },
-  { name: "codex", label: "Codex", product: "coding" },
-  { name: "langfuse", label: "Langfuse", product: "ai" },
+  { name: "openclaw", label: "OpenClaw", product: "coding", sourceType: "local" },
+  { name: "claude-code", label: "Claude Code", product: "coding", sourceType: "local" },
+  { name: "warp", label: "Warp", product: "coding", sourceType: "local" },
+  { name: "cline", label: "Cline", product: "coding", sourceType: "local" },
+  { name: "codex", label: "Codex", product: "coding", sourceType: "local" },
+  { name: "langfuse", label: "Langfuse", product: "ai", sourceType: "api" },
 ];
 
 interface AdapterStatusBase {
   name: string;
   label: string;
   product: AdapterProduct;
+  sourceType: AdapterSourceType;
   traceCount: number;
   lastScanAt: string | null;
 }
@@ -62,6 +68,7 @@ async function buildAdapterStatus(
     label: known.label,
     // Prefer the installed adapter's self-declared product; fall back to the static catalog.
     product: loaded?.adapter.meta.product ?? known.product,
+    sourceType: loaded?.adapter.meta.sourceType ?? known.sourceType,
     traceCount: stats?.count ?? 0,
     lastScanAt: stats?.lastScanAt.toISOString() ?? null,
   };
