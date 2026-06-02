@@ -1,4 +1,4 @@
-import { asc, count, desc, eq } from "drizzle-orm";
+import { asc, count, desc, eq, sql } from "drizzle-orm";
 
 import type { Db } from "../client";
 import { analysisRuns } from "../schema";
@@ -49,12 +49,18 @@ export function createAnalysisRunRepository(db: Db) {
         .map(fromRow);
     },
     listAll(): AnalysisRunRow[] {
-      return db
-        .select()
-        .from(analysisRuns)
-        .orderBy(asc(analysisRuns.startedAt), asc(analysisRuns.analyzerName))
-        .all()
-        .map(fromRow);
+      return (
+        db
+          .select()
+          .from(analysisRuns)
+          // `startedAt` is ms-resolution and ties when analyzers run in the same millisecond. Break
+          // ties by insertion order (rowid) — which equals the pipeline's ascending-priority order —
+          // so the read-back is deterministic. (Was `analyzerName`, i.e. alphabetical, which flipped
+          // fault/waste-detector on a tie and randomly failed the priority-order assertion.)
+          .orderBy(asc(analysisRuns.startedAt), sql`rowid`)
+          .all()
+          .map(fromRow)
+      );
     },
     listByAnalyzerName(analyzerName: string): AnalysisRunRow[] {
       return db
