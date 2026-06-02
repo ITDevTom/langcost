@@ -59,3 +59,9 @@ export interface LangfuseObservationsPage {
   data: LangfuseObservation[];
   meta?: { cursor?: string | null } | null;
 }
+
+/** GET /api/public/traces is page-based: data + page metadata (no cursor). */
+export interface LangfuseTracesPage {
+  data: LangfuseTrace[];
+  meta?: { page?: number; limit?: number; totalItems?: number; totalPages?: number } | null;
+}

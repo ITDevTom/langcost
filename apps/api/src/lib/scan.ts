@@ -1,5 +1,5 @@
 import { runPipeline } from "@langcost/analyzers";
-import { MAX_SINCE_MS } from "@langcost/core";
+import { MAX_SINCE_DAYS } from "@langcost/core";
 import {
   createSettingsRepository,
   createTraceRepository,
@@ -18,10 +18,18 @@ export interface ScanResultPayload {
   durationMs: number;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 function toAdapterOptions(sourceConfig: SourceSettings & { source: string }, force = false) {
+  // Pull window: the user-chosen windowDays (e.g. Langfuse 30/60 days), capped to the OSS history
+  // limit. Unset (the default for local coding adapters) falls back to the full OSS window.
+  const windowDays =
+    typeof sourceConfig.windowDays === "number" && sourceConfig.windowDays > 0
+      ? Math.min(sourceConfig.windowDays, MAX_SINCE_DAYS)
+      : MAX_SINCE_DAYS;
   return {
     ...(sourceConfig.sourcePath ? { sourcePath: sourceConfig.sourcePath } : {}),
-    since: new Date(Date.now() - MAX_SINCE_MS),
+    since: new Date(Date.now() - windowDays * DAY_MS),
     force,
     ...(sourceConfig.apiKey ? { apiKey: sourceConfig.apiKey } : {}),
     ...(sourceConfig.apiUrl ? { apiUrl: sourceConfig.apiUrl } : {}),
@@ -47,6 +55,9 @@ function requireSourceConfig(
     ...(useStoredCreds && settings?.sourcePath ? { sourcePath: settings.sourcePath } : {}),
     ...(useStoredCreds && settings?.apiKey ? { apiKey: settings.apiKey } : {}),
     ...(useStoredCreds && settings?.apiUrl ? { apiUrl: settings.apiUrl } : {}),
+    ...(useStoredCreds && typeof settings?.windowDays === "number"
+      ? { windowDays: settings.windowDays }
+      : {}),
   };
 }
 

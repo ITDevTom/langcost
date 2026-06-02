@@ -17,6 +17,7 @@ export interface SettingsResponse {
   source?: string;
   sourcePath?: string;
   apiUrl?: string;
+  windowDays?: number;
   hasApiKey: boolean;
 }
 
@@ -25,6 +26,7 @@ export interface SaveSettingsInput {
   sourcePath?: string;
   apiKey?: string;
   apiUrl?: string;
+  windowDays?: number;
 }
 
 export interface ScanResponse {
@@ -517,6 +519,9 @@ interface AdapterStatusBase {
   // Mirrors AdapterProduct in @langcost/core and ProductMode in lib/modes (not imported here: this
   // client stays dependency-free and defines its own response unions, like Severity/TraceStatus).
   product: "coding" | "ai";
+  // Whether the source is a remote API (needs credentials) or a local path. Drives the Settings
+  // connect form. Mirrors AdapterMeta.sourceType in @langcost/core.
+  sourceType: "local" | "api";
   traceCount: number;
   lastScanAt: string | null;
 }

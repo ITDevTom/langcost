@@ -9,6 +9,9 @@ export interface SourceSettings {
   sourcePath?: string;
   apiKey?: string;
   apiUrl?: string;
+  /** How many days of history to pull (API sources). Bounds the fetch so large projects don't
+   *  time out / exhaust the source's rate limit. Capped to the OSS window by the scan layer. */
+  windowDays?: number;
 }
 
 export type SettingRecord = typeof settings.$inferInsert;
@@ -68,6 +71,9 @@ export function createSettingsRepository(db: Db) {
           ...(value.sourcePath ? { sourcePath: value.sourcePath } : {}),
           ...(value.apiKey ? { apiKey: value.apiKey } : {}),
           ...(value.apiUrl ? { apiUrl: value.apiUrl } : {}),
+          ...(typeof value.windowDays === "number" && value.windowDays > 0
+            ? { windowDays: value.windowDays }
+            : {}),
         },
         updatedAt,
       );

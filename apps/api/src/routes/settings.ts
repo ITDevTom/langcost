@@ -14,6 +14,7 @@ export function createSettingsRoute(options: { dbPath?: string } = {}) {
         ...(config?.source ? { source: config.source } : {}),
         ...(config?.sourcePath ? { sourcePath: config.sourcePath } : {}),
         ...(config?.apiUrl ? { apiUrl: config.apiUrl } : {}),
+        ...(typeof config?.windowDays === "number" ? { windowDays: config.windowDays } : {}),
         hasApiKey: Boolean(config?.apiKey),
       };
     });
@@ -28,7 +29,15 @@ export function createSettingsRoute(options: { dbPath?: string } = {}) {
     }
 
     await withDb(options.dbPath, (db) => {
-      createSettingsRepository(db).setSourceConfig({
+      const repository = createSettingsRepository(db);
+      // Merge into the existing config for the SAME source so a partial update (e.g. changing only
+      // the window) preserves the stored apiKey — which GET redacts and the form can't resend.
+      // Switching to a different source starts clean so credentials never carry across sources.
+      const existing = repository.getSourceConfig();
+      const base = existing && existing.source === body.source ? existing : {};
+
+      repository.setSourceConfig({
+        ...base,
         source: body.source,
         ...(typeof body.sourcePath === "string" && body.sourcePath.length > 0
           ? { sourcePath: body.sourcePath }
@@ -38,6 +47,9 @@ export function createSettingsRoute(options: { dbPath?: string } = {}) {
           : {}),
         ...(typeof body.apiUrl === "string" && body.apiUrl.length > 0
           ? { apiUrl: body.apiUrl }
+          : {}),
+        ...(typeof body.windowDays === "number" && body.windowDays > 0
+          ? { windowDays: body.windowDays }
           : {}),
       });
     });

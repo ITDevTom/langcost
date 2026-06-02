@@ -4,25 +4,35 @@ import {
   type AdapterStatus,
   getAdapters,
   getRules,
+  getSettings,
   type InstalledAdapter,
   installAdapter,
   type MissingAdapter,
   type RuleCatalogEntry,
   type RuleConfigEntry,
   type RulesConfig,
+  type SettingsResponse,
   saveRules,
+  saveSettings,
   triggerScan,
   uninstallAdapter,
 } from "../api/client";
 import { formatInt, formatRelativeTime } from "../lib/format";
 import { MODES, type ProductMode } from "../lib/modes";
+import { type ApiSourceForm, getApiSourceForm } from "../lib/sources";
+
+interface CredentialsInput {
+  apiKey?: string;
+  apiUrl?: string;
+  windowDays?: number;
+}
 
 interface SettingsProps {
   mode: ProductMode;
   onShellRefresh: () => Promise<void> | void;
 }
 
-type RowAction = "idle" | "syncing" | "installing" | "uninstalling";
+type RowAction = "idle" | "syncing" | "installing" | "uninstalling" | "connecting";
 
 interface RowState {
   action: RowAction;
@@ -93,6 +103,7 @@ export function Settings({ mode, onShellRefresh }: SettingsProps) {
   const [adapters, setAdapters] = useState<AdapterStatus[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [rowState, setRowState] = useState<Record<string, RowState>>({});
+  const [settings, setSettings] = useState<SettingsResponse | null>(null);
 
   const [rulesCatalog, setRulesCatalog] = useState<RuleCatalogEntry[]>([]);
   const [rulesConfig, setRulesConfig] = useState<RulesConfig>({ rules: {} });
@@ -105,10 +116,15 @@ export function Settings({ mode, onShellRefresh }: SettingsProps) {
   const loadAll = useCallback(async () => {
     setListError(null);
     try {
-      const [adaptersResponse, rulesResponse] = await Promise.all([getAdapters(), getRules()]);
+      const [adaptersResponse, rulesResponse, settingsResponse] = await Promise.all([
+        getAdapters(),
+        getRules(),
+        getSettings(),
+      ]);
       setAdapters(adaptersResponse.adapters);
       setRulesCatalog(rulesResponse.catalog);
       setRulesConfig(rulesResponse.config);
+      setSettings(settingsResponse);
       setRulesDirty(false);
     } catch (cause) {
       setListError(cause instanceof Error ? cause.message : "Failed to load adapters.");
@@ -156,6 +172,18 @@ export function Settings({ mode, onShellRefresh }: SettingsProps) {
         return `Ingested ${result.tracesIngested} traces in ${Math.round(result.durationMs)}ms.`;
       },
       "Scan failed.",
+    );
+  }
+
+  function handleSaveCredentials(adapter: InstalledAdapter, input: CredentialsInput) {
+    void runRowAction(
+      adapter.name,
+      "connecting",
+      async () => {
+        await saveSettings({ source: adapter.name, ...input });
+        return "Connection saved. Click Sync to pull traces.";
+      },
+      "Failed to save connection.",
     );
   }
 
@@ -282,9 +310,11 @@ export function Settings({ mode, onShellRefresh }: SettingsProps) {
                   key={adapter.name}
                   adapter={adapter}
                   state={rowState[adapter.name] ?? INITIAL_ROW_STATE}
+                  settings={settings}
                   onSync={handleSync}
                   onInstall={handleInstall}
                   onUninstall={handleUninstall}
+                  onSaveCredentials={handleSaveCredentials}
                   rulesCatalog={rulesCatalog}
                   isExpanded={expanded[adapter.name] ?? false}
                   onToggleExpand={() => toggleExpand(adapter.name)}
@@ -337,9 +367,11 @@ function OssLimitsCallout() {
 interface AdapterRowProps {
   adapter: AdapterStatus;
   state: RowState;
+  settings: SettingsResponse | null;
   onSync: (adapter: InstalledAdapter) => void;
   onInstall: (adapter: MissingAdapter) => void;
   onUninstall: (adapter: InstalledAdapter) => void;
+  onSaveCredentials: (adapter: InstalledAdapter, input: CredentialsInput) => void;
   rulesCatalog: RuleCatalogEntry[];
   isExpanded: boolean;
   onToggleExpand: () => void;
@@ -353,9 +385,11 @@ interface AdapterRowProps {
 function AdapterRow({
   adapter,
   state,
+  settings,
   onSync,
   onInstall,
   onUninstall,
+  onSaveCredentials,
   rulesCatalog,
   isExpanded,
   onToggleExpand,
@@ -369,6 +403,8 @@ function AdapterRow({
   const enabledRuleCount = adapter.installed
     ? rulesCatalog.filter((rule) => isRuleChecked(rule.id)).length
     : 0;
+  // API sources (e.g. Langfuse) need credentials before Sync can work — show an in-UI connect form.
+  const apiForm = adapter.sourceType === "api" ? getApiSourceForm(adapter.name) : undefined;
 
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--surface-alt)] p-4">
@@ -449,6 +485,17 @@ function AdapterRow({
         </div>
       ) : null}
 
+      {adapter.installed && apiForm ? (
+        <ConnectForm
+          adapter={adapter}
+          form={apiForm}
+          settings={settings}
+          busy={busy}
+          connecting={state.action === "connecting"}
+          onSave={(input) => onSaveCredentials(adapter, input)}
+        />
+      ) : null}
+
       {adapter.installed && rulesCatalog.length > 0 ? (
         <div className="mt-3 border-t border-[color:var(--border)] pt-3">
           <button
@@ -516,6 +563,139 @@ function AdapterRow({
 
       {state.message ? <p className="mt-3 text-xs text-blue-200">{state.message}</p> : null}
       {state.error ? <p className="mt-3 text-xs text-red-300">{state.error}</p> : null}
+    </div>
+  );
+}
+
+interface ConnectFormProps {
+  adapter: InstalledAdapter;
+  form: ApiSourceForm;
+  settings: SettingsResponse | null;
+  busy: boolean;
+  connecting: boolean;
+  onSave: (input: CredentialsInput) => void;
+}
+
+const FIELD_CLASS = "field-shell mt-1 w-full rounded-xl px-3 py-2 text-sm";
+
+function ConnectForm({ adapter, form, settings, busy, connecting, onSave }: ConnectFormProps) {
+  // The saved source_config holds creds for one source — only treat this row as connected when it
+  // is that source and a key is stored. GET redacts the key, so the inputs always start empty.
+  const isSavedSource = settings?.source === adapter.name;
+  const connected = isSavedSource && Boolean(settings?.hasApiKey);
+
+  const [publicKey, setPublicKey] = useState("");
+  const [secretKey, setSecretKey] = useState("");
+  const [apiUrl, setApiUrl] = useState(
+    (isSavedSource ? settings?.apiUrl : undefined) ?? form.defaultApiUrl,
+  );
+  const [windowDays, setWindowDays] = useState(
+    (isSavedSource ? settings?.windowDays : undefined) ?? form.defaultWindowDays,
+  );
+
+  const hasBothKeys = publicKey.trim().length > 0 && secretKey.trim().length > 0;
+  // Saving without keys is allowed only when already connected (updating host/window keeps the key,
+  // thanks to the same-source merge in PUT /settings). A fresh connect requires both keys.
+  const canSave = hasBothKeys || connected;
+
+  function submit() {
+    onSave({
+      ...(hasBothKeys ? { apiKey: `${publicKey.trim()}:${secretKey.trim()}` } : {}),
+      ...(apiUrl.trim() ? { apiUrl: apiUrl.trim() } : {}),
+      windowDays,
+    });
+  }
+
+  return (
+    <div className="mt-3 border-t border-[color:var(--border)] pt-3">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium text-slate-300">Connection</span>
+        {connected ? (
+          <span className="rounded-full border border-emerald-400/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-emerald-200">
+            connected
+          </span>
+        ) : (
+          <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-amber-200">
+            not connected
+          </span>
+        )}
+      </div>
+      <p className="mt-2 text-[11px] leading-snug text-slate-500">
+        {form.helpText}{" "}
+        <a
+          href={form.docsUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="underline decoration-dotted underline-offset-2 hover:text-slate-300"
+        >
+          Where do I find these? →
+        </a>
+      </p>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block text-xs text-slate-400">
+          {form.publicKeyLabel}
+          <input
+            type="text"
+            value={publicKey}
+            onChange={(event) => setPublicKey(event.target.value)}
+            placeholder={connected ? "•••••• saved" : form.publicKeyPlaceholder}
+            autoComplete="off"
+            className={FIELD_CLASS}
+          />
+        </label>
+        <label className="block text-xs text-slate-400">
+          {form.secretKeyLabel}
+          <input
+            type="password"
+            value={secretKey}
+            onChange={(event) => setSecretKey(event.target.value)}
+            placeholder={connected ? "•••••• saved" : form.secretKeyPlaceholder}
+            autoComplete="off"
+            className={FIELD_CLASS}
+          />
+        </label>
+        <label className="block text-xs text-slate-400">
+          {form.apiUrlLabel}
+          <input
+            type="text"
+            value={apiUrl}
+            onChange={(event) => setApiUrl(event.target.value)}
+            placeholder={form.apiUrlPlaceholder}
+            className={FIELD_CLASS}
+          />
+        </label>
+        <label className="block text-xs text-slate-400">
+          History window
+          <select
+            value={windowDays}
+            onChange={(event) => setWindowDays(Number(event.target.value))}
+            className={FIELD_CLASS}
+          >
+            {form.windowOptions.map((option) => (
+              <option key={option.days} value={option.days}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <span className="text-[11px] text-slate-500">
+          {connected
+            ? "Update host/window without re-entering keys, or paste new keys to rotate."
+            : "Enter both keys to connect, then Sync."}
+        </span>
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy || !canSave}
+          className="button-primary px-3 py-2 text-sm"
+        >
+          {connecting ? "Saving…" : connected ? "Update connection" : "Save & connect"}
+        </button>
+      </div>
     </div>
   );
 }
