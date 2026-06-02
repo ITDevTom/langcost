@@ -35,6 +35,28 @@ describe("satisfiesRequirements", () => {
     ).toBe(true);
   });
 
+  it("satisfies cacheTokens when span carries cacheReads (cline adapter key)", () => {
+    expect(
+      satisfiesRequirements(ctx({ llmSpans: [{ metadata: { cacheReads: 10 } }] }), ["cacheTokens"]),
+    ).toBe(true);
+  });
+
+  it("satisfies cacheTokens when span carries cachedInputTokens (codex adapter key)", () => {
+    expect(
+      satisfiesRequirements(ctx({ llmSpans: [{ metadata: { cachedInputTokens: 500 } }] }), [
+        "cacheTokens",
+      ]),
+    ).toBe(true);
+  });
+
+  it("satisfies cacheTokens when span carries cacheReadTokens", () => {
+    expect(
+      satisfiesRequirements(ctx({ llmSpans: [{ metadata: { cacheReadTokens: 200 } }] }), [
+        "cacheTokens",
+      ]),
+    ).toBe(true);
+  });
+
   it("never blocks on requirements the normalized model does not yet capture (toolDefs)", () => {
     expect(satisfiesRequirements(ctx({}), ["toolDefs"])).toBe(true);
   });

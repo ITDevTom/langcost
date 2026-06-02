@@ -21,6 +21,7 @@ apps/*/CLAUDE.md
 .cursor/
 .claude/
 .codex/
+.ai-context.yaml
 
 # Internal docs — keep local, not on GitHub
 SPEC.md

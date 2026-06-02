@@ -2,13 +2,18 @@ import type { RuleCatalogEntry, RulesConfig } from "@langcost/core";
 
 import { agentLoopsRule } from "./agent-loops";
 import { cacheExpiryRule } from "./cache-expiry";
+import { duplicateRagRule } from "./duplicate-rag";
 import { getFaultRuleCatalog } from "./fault/registry";
 import { highOutputRule } from "./high-output";
 import { lowCacheRule } from "./low-cache";
 import { modelOveruseRule } from "./model-overuse";
+import { oversizedContextRule } from "./oversized-context";
 import { retryPatternsRule } from "./retry-patterns";
 import { toolFailuresRule } from "./tool-failures";
 import type { ResolvedRuleConfig, WasteRule } from "./types";
+import { unboundedHistoryRule } from "./unbounded-history";
+import { uncachedPromptRule } from "./uncached-prompt";
+import { unusedToolsRule } from "./unused-tools";
 
 /**
  * Built-in rules. This is the registry seam: today it is populated statically; a future rule-pack
@@ -21,7 +26,12 @@ const BUILTIN_RULES: readonly WasteRule[] = [
   agentLoopsRule,
   retryPatternsRule,
   toolFailuresRule,
+  duplicateRagRule,
   highOutputRule,
+  oversizedContextRule,
+  unboundedHistoryRule,
+  uncachedPromptRule,
+  unusedToolsRule,
   cacheExpiryRule,
 ];
 
